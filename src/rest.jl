@@ -26,9 +26,6 @@ end
 
 @post "/subscribe" function(req::HTTP.Request)
     data = json(req)
-    open(joinpath(DATA_FOLDER, "pushs", "$(now()).json"), "w") do io
-        JSON3.pretty(io, data)
-    end
     if data[:aspect_type] == "create" && data[:object_type] == "activity"
         @spawn add_activity(data[:owner_id], data[:object_id])
     end

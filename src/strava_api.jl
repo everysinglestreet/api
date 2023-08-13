@@ -79,11 +79,14 @@ function prepend_activity_description(access_token, activity_data, desc)
     set_activity_fields(access_token, activity_data[:id], Dict(:description => strip(new_desc)))
 end
 
-function add_activity(user_id, activity_id)
+function add_activity(user_id, activity_id, force_update=false)
     access_token = get_access_token(user_id)
     activity_data = get_activity_data(access_token, activity_id)
     start_time = activity_data[:start_date]
-    download_activity(user_id, access_token, activity_id, start_time) || return
+    is_new_activity = download_activity(user_id, access_token, activity_id, start_time)
+    if !is_new_activity && !force_update
+        return
+    end
     
     activity_path = joinpath(DATA_FOLDER, "activities", "$user_id", "$activity_id.json")
     user_data = readjson(joinpath(DATA_FOLDER, "user_data", "$user_id.json"))
@@ -98,5 +101,52 @@ function add_activity(user_id, activity_id)
     walked_xml_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.xml")
     EverySingleStreet.create_xml(city_data["nodes"], data.walked_parts, walked_xml_path)
 
+    run_osmosis_conversion(user_id, user_data[:city_name])
+    run_tilemaker_conversion(user_id, user_data[:city_name])
+    run_restart_overlay()
+
     prepend_activity_description(access_token, activity_data, added_kms_str)
+end
+
+function run_osmosis_conversion(user_id, city_name)
+    essaly_url = ENV["ESSALY_URL"]
+    url = "$(essaly_url)/api/executeOsmosis"
+    params = Dict(
+        "input"  => joinpath(DATA_FOLDER, "data", "city_data", "$user_id", "$(city_name)_walked.xml"),
+        "output" => joinpath(DATA_FOLDER, "data", "city_data", "$user_id", "$(city_name)_walked.osm.pbf"),
+    )
+    raw_response = HTTP.request("POST", url,
+             ["Content-Type" => "application/x-www-form-urlencoded"],
+             HTTP.URIs.escapeuri(params))
+    json_response = JSON3.read(String(raw_response.body))
+    if !json_response["metadata"]["success"]
+        @show response
+    end
+end
+
+function run_tilemaker_conversion(user_id, city_name)
+    essaly_url = ENV["ESSALY_URL"]
+    url = "$(essaly_url)/api/executeTilemaker"
+    params = Dict(
+        "input"  => joinpath(DATA_FOLDER, "data", "city_data", "$user_id", "$(city_name)_walked.osm.pbf"),
+        "output" => joinpath(DATA_FOLDER, "data", "city_data", "$user_id", "walked.mbtiles"),
+        "config" => joinpath(DATA_FOLDER, "data", "tilemaker", "config.json"),
+    )
+    raw_response = HTTP.request("POST", url,
+             ["Content-Type" => "application/x-www-form-urlencoded"],
+             HTTP.URIs.escapeuri(params))
+             json_response = JSON3.read(String(raw_response.body))
+    if !json_response["metadata"]["success"]
+        @show response
+    end
+end
+
+function run_restart_overlay()
+    essaly_url = ENV["ESSALY_URL"]
+    url = "$(essaly_url)/api/restartOverlay"
+    raw_response = HTTP.request("POST", url)
+             json_response = JSON3.read(String(raw_response.body))
+    if !json_response["metadata"]["success"]
+        @show response
+    end
 end
