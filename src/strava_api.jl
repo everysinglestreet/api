@@ -113,10 +113,14 @@ function run_regenerate_overlay(user_id, city_name)
         "osmosisReadXml"  => joinpath(DATA_FOLDER, "city_data", "$user_id", "$(city_name)_walked.xml"),
         "tilemakerConfig" => joinpath(DATA_FOLDER, "tilemaker", "config.json"),
     )
+    @show params
     raw_response = HTTP.request("POST", url,
              ["Content-Type" => "application/x-www-form-urlencoded"],
              HTTP.URIs.escapeuri(params))
              json_response = JSON3.read(String(raw_response.body))
+    if raw_response.status != 200
+        @warn "Status code for run_regenerate_overlay: $(raw_response.status)"
+    end
     if !json_response["metadata"]["success"]
         @show response
     end
