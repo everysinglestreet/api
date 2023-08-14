@@ -101,50 +101,21 @@ function add_activity(user_id, activity_id, force_update=false)
     walked_xml_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.xml")
     EverySingleStreet.create_xml(city_data["nodes"], data.walked_parts, walked_xml_path)
 
-    run_osmosis_conversion(user_id, user_data[:city_name])
-    run_tilemaker_conversion(user_id, user_data[:city_name])
-    run_restart_overlay()
+    run_regenerate_overlay(user_id, user_data[:city_name])
 
     prepend_activity_description(access_token, activity_data, added_kms_str)
 end
 
-function run_osmosis_conversion(user_id, city_name)
+function run_regenerate_overlay(user_id, city_name)
     essaly_url = ENV["ESSALY_URL"]
-    url = "$(essaly_url)/api/executeOsmosis"
+    url = "$(essaly_url)/api/regenerateOverlay"
     params = Dict(
-        "input"  => joinpath(DATA_FOLDER, "data", "city_data", "$user_id", "$(city_name)_walked.xml"),
-        "output" => joinpath(DATA_FOLDER, "data", "city_data", "$user_id", "$(city_name)_walked.osm.pbf"),
+        "osmosisReadXml"  => joinpath(DATA_FOLDER, "data", "city_data", "$user_id", "$(city_name)_walked.xml"),
+        "tilemakerConfig" => joinpath(DATA_FOLDER, "data", "tilemaker", "config.json"),
     )
     raw_response = HTTP.request("POST", url,
              ["Content-Type" => "application/x-www-form-urlencoded"],
              HTTP.URIs.escapeuri(params))
-    json_response = JSON3.read(String(raw_response.body))
-    if !json_response["metadata"]["success"]
-        @show response
-    end
-end
-
-function run_tilemaker_conversion(user_id, city_name)
-    essaly_url = ENV["ESSALY_URL"]
-    url = "$(essaly_url)/api/executeTilemaker"
-    params = Dict(
-        "input"  => joinpath(DATA_FOLDER, "data", "city_data", "$user_id", "$(city_name)_walked.osm.pbf"),
-        "output" => joinpath(DATA_FOLDER, "data", "city_data", "$user_id", "walked.mbtiles"),
-        "config" => joinpath(DATA_FOLDER, "data", "tilemaker", "config.json"),
-    )
-    raw_response = HTTP.request("POST", url,
-             ["Content-Type" => "application/x-www-form-urlencoded"],
-             HTTP.URIs.escapeuri(params))
-             json_response = JSON3.read(String(raw_response.body))
-    if !json_response["metadata"]["success"]
-        @show response
-    end
-end
-
-function run_restart_overlay()
-    essaly_url = ENV["ESSALY_URL"]
-    url = "$(essaly_url)/api/restartOverlay"
-    raw_response = HTTP.request("POST", url)
              json_response = JSON3.read(String(raw_response.body))
     if !json_response["metadata"]["success"]
         @show response
