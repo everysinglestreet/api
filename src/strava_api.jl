@@ -100,7 +100,7 @@ function add_activity(user_id, activity_id, force_update=false)
 
     walked_xml_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.xml")
     EverySingleStreet.create_xml(city_data["nodes"], data.walked_parts, walked_xml_path)
-
+    
     run_regenerate_overlay(user_id, user_data[:city_name])
 
     prepend_activity_description(access_token, activity_data, added_kms_str)
@@ -110,8 +110,8 @@ function run_regenerate_overlay(user_id, city_name)
     essaly_url = ENV["ESSALY_URL"]
     url = "$(essaly_url)/api/regenerateOverlay"
     params = Dict(
-        "osmosisReadXml"  => joinpath(DATA_FOLDER, "data", "city_data", "$user_id", "$(city_name)_walked.xml"),
-        "tilemakerConfig" => joinpath(DATA_FOLDER, "data", "tilemaker", "config.json"),
+        "osmosisReadXml"  => joinpath(DATA_FOLDER, "city_data", "$user_id", "$(city_name)_walked.xml"),
+        "tilemakerConfig" => joinpath(DATA_FOLDER, "tilemaker", "config.json"),
     )
     raw_response = HTTP.request("POST", url,
              ["Content-Type" => "application/x-www-form-urlencoded"],
