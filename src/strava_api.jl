@@ -85,21 +85,25 @@ function add_activity(user_id, activity_id, force_update=false)
     start_time = activity_data[:start_date]
     is_new_activity = download_activity(user_id, access_token, activity_id, start_time)
     if !is_new_activity && !force_update
+        @info "The activity was already parsed at an earlier stage"
         return
     end
     
     activity_path = joinpath(DATA_FOLDER, "activities", "$user_id", "$activity_id.json")
     user_data = readjson(joinpath(DATA_FOLDER, "user_data", "$user_id.json"))
     city_data_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name]).jld2")
+    city_walked_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.jld2")
     city_data = load(city_data_path)
-    data = EverySingleStreet.map_matching(activity_path, city_data["ways"], city_data["walked_parts"], "tmp_local_map.json")
+    city_data_map = city_data["no_graph_map"]
+    city_walked_parts = load(city_walked_path)["walked_parts"]
+    data = EverySingleStreet.map_matching(activity_path, city_data_map.ways, city_walked_parts, "tmp_local_map.json")
     rm("tmp_local_map.json")
 
     added_kms_str = @sprintf "Added road kms: %.2f km" data.added_kms
-    save(city_data_path, Dict("nodes" => city_data["nodes"], "ways" => city_data["ways"], "walked_parts" => data.walked_parts))
+    save(city_walked_path, Dict("walked_parts" => data.walked_parts))
 
     walked_xml_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.xml")
-    EverySingleStreet.create_xml(city_data["nodes"], data.walked_parts, walked_xml_path)
+    EverySingleStreet.create_xml(city_data_map.nodes, data.walked_parts, walked_xml_path)
     
     run_regenerate_overlay(user_id, user_data[:city_name])
 
@@ -107,6 +111,10 @@ function add_activity(user_id, activity_id, force_update=false)
 end
 
 function run_regenerate_overlay(user_id, city_name)
+    if !haskey(ENV, "ESSALY_URL") 
+        @warn "No essaly url is given" 
+        return
+    end
     essaly_url = ENV["ESSALY_URL"]
     url = "$(essaly_url)/api/regenerateOverlay"
     params = Dict(
