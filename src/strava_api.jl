@@ -79,6 +79,30 @@ function prepend_activity_description(access_token, activity_data, desc)
     set_activity_fields(access_token, activity_data[:id], Dict(:description => strip(new_desc)))
 end
 
+function calculate_statistics(city_map, walked_parts)
+    walked_road_km = EverySingleStreet.total_length(walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
+    road_km = EverySingleStreet.total_length(city_map; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
+    district_perc = EverySingleStreet.get_walked_district_perc(city_map, collect(values(walked_parts.ways)))
+    return (walked_road_km = walked_road_km, road_km = road_km, district_percentages = district_perc)
+end
+
+function compare_statistics(before, after)
+    result_dict = OrderedDict{Symbol, String}()
+    before_total_perc = before.walked_road_km / before.road_km * 100
+    after_total_perc = after.walked_road_km / after.road_km * 100
+    if floor(Int, after_total_perc) > floor(Int, before_total_perc)
+        result_dict[Symbol("Total: ")] = @sprintf "%.0f%%" after_total_perc
+    end
+    for (district, perc)  in after.district_percentages
+        if !haskey(before.district_percentages, district)
+            result_dict[Symbol("$district: ")] = @sprintf "First %.1f%%" perc
+        elseif perc ÷ 5 > before.district_percentages[district] ÷ 5
+            result_dict[Symbol("$district: ")] = @sprintf "> %.0f%%" perc ÷ 5 * 5
+        end
+    end
+    return result_dict
+end
+
 function add_activity(user_id, activity_id, force_update=false)
     access_token = get_access_token(user_id)
     activity_data = get_activity_data(access_token, activity_id)
@@ -96,7 +120,9 @@ function add_activity(user_id, activity_id, force_update=false)
     city_data = load(city_data_path)
     city_data_map = city_data["no_graph_map"]
     city_walked_parts = load(city_walked_path)["walked_parts"]
+    statistics_before = calculate_statistics(city_data_map, city_walked_parts)
     data = EverySingleStreet.map_matching(activity_path, city_data_map.ways, city_walked_parts, "tmp_local_map.json")
+    statistics_after = calculate_statistics(city_data_map, data.walked_parts)
     rm("tmp_local_map.json")
 
     added_kms_str = @sprintf "Added road kms: %.2f km" data.added_kms
@@ -107,7 +133,12 @@ function add_activity(user_id, activity_id, force_update=false)
     
     run_regenerate_overlay(user_id, user_data[:city_name])
 
-    prepend_activity_description(access_token, activity_data, added_kms_str)
+    desc = added_kms_str
+    for (key, value) in compare_statistics(statistics_before, statistics_after)
+        desc = "$desc\n$key $value"
+    end
+
+    prepend_activity_description(access_token, activity_data, desc)
 end
 
 function run_regenerate_overlay(user_id, city_name)
