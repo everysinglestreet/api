@@ -140,8 +140,9 @@ function add_activity(user_id, activity_id, force_update=false)
     
     run_regenerate_overlay(user_id, user_data[:city_name])
 
+    walked_road_kms_str = @sprintf "Walked road kms: %.2f km" data.this_walked_road_km
     added_kms_str = @sprintf "Added road kms: %.2f km" data.added_kms
-    desc = added_kms_str
+    desc = "$walked_road_kms_str\n$added_kms_str"
     for (key, value) in compare_statistics(statistics_before, statistics_after)
         desc = "$desc\n$key $value"
     end
