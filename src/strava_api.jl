@@ -126,6 +126,16 @@ function get_district_statistics(user_id)
     return result
 end
 
+function get_district_tags(user_id)
+    district_stats = get_district_statistics(user_id)
+    district_tags = Dict{Symbol, Vector{Symbol}}()
+    for district in district_stats
+        perc_rounded = round(Int, district[:perc])
+        district_tags[district[:name]] = [Symbol("district_$(perc_rounded)")]
+    end
+    return district_tags
+end
+
 function regenerate_overlay(user_id)
     user_data = readjson(joinpath(DATA_FOLDER, "user_data", "$user_id.json"))
     run_regenerate_overlay(user_id, user_data[:city_name])
@@ -150,12 +160,15 @@ function add_activity(user_id, activity_id, force_update=false)
     city_walked_parts = load(city_walked_path)["walked_parts"]
     statistics_before = calculate_statistics(city_data_map, city_walked_parts)
     data = EverySingleStreet.map_matching(activity_path, city_data_map.ways, city_walked_parts, "tmp_local_map.json")
+    @info "Finished map map_matching"
     statistics_after = calculate_statistics(city_data_map, data.walked_parts)
     rm("tmp_local_map.json")
 
     walked_xml_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.xml")
-    EverySingleStreet.create_xml(city_data_map.nodes, data.walked_parts, walked_xml_path)
-    
+    district_tags = get_district_tags(user_id)
+    EverySingleStreet.create_xml(city_data_map.nodes, data.walked_parts, walked_xml_path; districts=city_data_map.districts, district_tags)
+    @info "Finished creating xml"
+
     run_regenerate_overlay(user_id, user_data[:city_name])
 
     walked_road_kms_str = @sprintf "Walked road kms: %.2f km" data.this_walked_road_km
