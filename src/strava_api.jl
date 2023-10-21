@@ -126,14 +126,14 @@ function get_district_statistics(user_id)
     return result
 end
 
-function get_district_tags(user_id)
+function get_district_levels(user_id)
     district_stats = get_district_statistics(user_id)
-    district_tags = Dict{Symbol, Vector{Symbol}}()
+    district_levels = Dict{Symbol, Int}()
     for district in district_stats
         perc_rounded = round(Int, district[:perc])
-        district_tags[district[:name]] = [Symbol("district_$(perc_rounded)")]
+        district_levels[district[:name]] = perc_rounded
     end
-    return district_tags
+    return district_levels
 end
 
 function regenerate_overlay(user_id)
@@ -165,8 +165,8 @@ function add_activity(user_id, activity_id, force_update=false)
     rm("tmp_local_map.json")
 
     walked_xml_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.xml")
-    district_tags = get_district_tags(user_id)
-    EverySingleStreet.create_xml(city_data_map.nodes, data.walked_parts, walked_xml_path; districts=city_data_map.districts, district_tags)
+    district_levels = get_district_levels(user_id)
+    EverySingleStreet.create_xml(city_data_map.nodes, data.walked_parts, walked_xml_path; districts=city_data_map.districts, district_levels)
     @info "Finished creating xml"
 
     run_regenerate_overlay(user_id, user_data[:city_name])
