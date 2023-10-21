@@ -110,7 +110,20 @@ function get_district_statistics(user_id)
     city_data = load(city_data_path)
     city_data_map = city_data["no_graph_map"]
     city_walked_parts = load(city_walked_path)["walked_parts"]
-    return calculate_statistics(city_data_map, city_walked_parts).district_percentages
+    
+    walked_district_kms = EverySingleStreet.get_district_kms(city_data_map, collect(values(city_walked_parts.ways)))
+    district_kms = EverySingleStreet.get_district_kms(city_data_map)
+
+    result = Vector{Dict{Symbol, Any}}()
+    for district in keys(district_kms)
+        if !haskey(walked_district_kms, district)
+            push!(result, Dict(:name => district, :kms => district_kms[district], :walked_kms => 0.0, :perc => 0.0))
+            continue 
+        end
+        push!(result, Dict(:name => district, :kms => district_kms[district], :walked_kms => walked_district_kms[district], :perc => 100 * (walked_district_kms[district] / district_kms[district])))
+    end
+    result = sort(result, by=(d->d[:perc]), rev=true)
+    return result
 end
 
 function add_activity(user_id, activity_id, force_update=false)
