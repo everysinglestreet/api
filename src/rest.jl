@@ -33,4 +33,9 @@ end
     return "EVENT_RECEIVED"
 end
 
+@get "/districts" function(req::HTTP.Request)
+    data = json(req)
+    return get_district_statistics(data[:owner_id])
+end
+
 serve(host="0.0.0.0", port=8000)

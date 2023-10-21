@@ -103,6 +103,16 @@ function compare_statistics(before, after)
     return result_dict
 end
 
+function get_district_statistics(user_id)
+    user_data = readjson(joinpath(DATA_FOLDER, "user_data", "$user_id.json"))
+    city_data_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name]).jld2")
+    city_walked_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.jld2")
+    city_data = load(city_data_path)
+    city_data_map = city_data["no_graph_map"]
+    city_walked_parts = load(city_walked_path)["walked_parts"]
+    return calculate_statistics(city_data_map, city_walked_parts).district_percentages
+end
+
 function add_activity(user_id, activity_id, force_update=false)
     access_token = get_access_token(user_id)
     activity_data = get_activity_data(access_token, activity_id)
@@ -125,20 +135,19 @@ function add_activity(user_id, activity_id, force_update=false)
     statistics_after = calculate_statistics(city_data_map, data.walked_parts)
     rm("tmp_local_map.json")
 
-    added_kms_str = @sprintf "Added road kms: %.2f km" data.added_kms
-    save(city_walked_path, Dict("walked_parts" => data.walked_parts))
-
     walked_xml_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.xml")
     EverySingleStreet.create_xml(city_data_map.nodes, data.walked_parts, walked_xml_path)
     
     run_regenerate_overlay(user_id, user_data[:city_name])
 
+    added_kms_str = @sprintf "Added road kms: %.2f km" data.added_kms
     desc = added_kms_str
     for (key, value) in compare_statistics(statistics_before, statistics_after)
         desc = "$desc\n$key $value"
     end
 
     prepend_activity_description(access_token, activity_data, desc)
+    save(city_walked_path, Dict("walked_parts" => data.walked_parts))
 end
 
 function run_regenerate_overlay(user_id, city_name)
