@@ -126,6 +126,11 @@ function get_district_statistics(user_id)
     return result
 end
 
+function regenerate_overlay(user_id)
+    user_data = readjson(joinpath(DATA_FOLDER, "user_data", "$user_id.json"))
+    run_regenerate_overlay(user_id, user_data[:city_name])
+end
+
 function add_activity(user_id, activity_id, force_update=false)
     access_token = get_access_token(user_id)
     activity_data = get_activity_data(access_token, activity_id)

@@ -33,6 +33,12 @@ end
     return "EVENT_RECEIVED"
 end
 
+@post "/regenerateOverlay" function(req::HTTP.Request)
+    data = json(req)
+    regenerate_overlay(data[:owner_id])
+    return Dict(:success => true)
+end
+
 @get "/districts" function(req::HTTP.Request)
     data = json(req)
     return get_district_statistics(data[:owner_id])
