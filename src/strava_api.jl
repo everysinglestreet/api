@@ -130,7 +130,7 @@ function get_district_levels(user_id)
     district_stats = get_district_statistics(user_id)
     district_levels = Dict{Symbol, Int}()
     for district in district_stats
-        perc_rounded = round(Int, district[:perc])
+        perc_rounded = round(Int, district[:perc]/10)
         district_levels[district[:name]] = perc_rounded
     end
     return district_levels
