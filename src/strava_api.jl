@@ -94,7 +94,8 @@ function compare_statistics(before, after)
         result_dict[Symbol("Total: ")] = @sprintf "%.0f%%" after_total_perc
     end
     for (district, perc)  in after.district_percentages
-        if !haskey(before.district_percentages, district)
+        iszero(perc) && continue
+        if !haskey(before.district_percentages, district) || iszero(before.district_percentages[district])
             result_dict[Symbol("$district: ")] = @sprintf "First %.1f%%" perc
         elseif perc ÷ 5 > before.district_percentages[district] ÷ 5
             result_dict[Symbol("$district: ")] = @sprintf "> %.0f%%" perc ÷ 5 * 5
