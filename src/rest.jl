@@ -33,6 +33,14 @@ end
     return "EVENT_RECEIVED"
 end
 
+
+@post "/full_update" function(req::HTTP.Request)
+    data = json(req)
+    @spawn full_update(data[:owner_id])
+    return "EVENT_RECEIVED"
+end
+
+
 @post "/regenerateOverlay" function(req::HTTP.Request)
     data = json(req)
     regenerate_overlay(data[:owner_id])

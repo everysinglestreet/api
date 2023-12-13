@@ -142,7 +142,46 @@ function regenerate_overlay(user_id)
     run_regenerate_overlay(user_id, user_data[:city_name])
 end
 
-function add_activity(user_id, activity_id, force_update=false)
+function get_all_activity_ids(access_token)
+    ids = Int[]
+
+    i = 1
+    while i <= 1000
+        len_before = length(ids)
+        url = "https://www.strava.com/api/v3/athlete/activities?per_page=30&page=$i"
+
+        headers = Dict("Authorization" => "Bearer $access_token", "Content-Type" => "application/json")
+
+        r = HTTP.request("GET", url, headers)
+        json_result = JSON3.read(String(r.body))
+        for res in json_result
+            push!(ids, res["id"])
+        end
+        if length(ids) == len_before
+            break
+        end
+        i += 1
+    end
+    
+    return ids
+end
+
+function full_update(user_id)
+    access_token = get_access_token(user_id)
+    all_ids = get_all_activity_ids(access_token)
+    user_data = readjson(joinpath(DATA_FOLDER, "user_data", "$user_id.json"))
+    walked_before = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.jld2")
+    walked_old = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked_old.jld2")
+    mv(walked_before, walked_old)
+    walked_parts = EverySingleStreet.WalkedParts(Dict{String, Vector{Int}}(), Dict{Int, EverySingleStreet.WalkedWay}())
+    save(walked_before, Dict("walked_parts" => walked_parts))
+
+    for activity_id in all_ids
+        add_activity(user_id, activity_id, true; update_description=false)
+    end
+end
+
+function add_activity(user_id, activity_id, force_update=false; update_description=true)
     access_token = get_access_token(user_id)
     activity_data = get_activity_data(access_token, activity_id)
     start_time = activity_data[:start_date]
@@ -179,7 +218,7 @@ function add_activity(user_id, activity_id, force_update=false)
         desc = "$desc\n$key $value"
     end
 
-    prepend_activity_description(access_token, activity_data, desc)
+    update_description && prepend_activity_description(access_token, activity_data, desc)
     save(city_walked_path, Dict("walked_parts" => data.walked_parts))
 end
 
