@@ -178,9 +178,13 @@ function full_update(user_id)
     user_data = readjson(joinpath(DATA_FOLDER, "user_data", "$user_id.json"))
     walked_before = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.jld2")
     walked_old = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked_old.jld2")
-    mv(walked_before, walked_old; force=true)
-    walked_parts = EverySingleStreet.WalkedParts(Dict{String, Vector{Int}}(), Dict{Int, EverySingleStreet.WalkedWay}())
-    save(walked_before, Dict("walked_parts" => walked_parts))
+    time_diff = Dates.unix2datetime(time()) - Dates.unix2datetime(mtime(walked_before))
+    if time_diff > Hour(5)
+        println("Moved old walked.jld2")
+        mv(walked_before, walked_old; force=true)
+        walked_parts = EverySingleStreet.WalkedParts(Dict{String, Vector{Int}}(), Dict{Int, EverySingleStreet.WalkedWay}())
+        save(walked_before, Dict("walked_parts" => walked_parts))   
+    end
     for (i,activity_data) in enumerate(all_activities)
         perc = i/length(all_activities)*100
         @show perc
