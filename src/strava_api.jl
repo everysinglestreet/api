@@ -184,20 +184,24 @@ function full_update(user_id)
     for (i,activity_data) in enumerate(all_activities)
         perc = i/length(all_activities)*100
         @show perc
-        add_activity(user_id, access_token, activity_data, true; update_description=false, shall_regnerate_overlay=i % 10 == 0)
+        shall_regnerate_overlay = i % 10 == 0
+        shall_regnerate_overlay |= i == length(all_activities)
+        add_activity(user_id, access_token, activity_data, >(Hour(5)); update_description=false, shall_regnerate_overlay)
     end
 end
 
-function add_activity(user_id, access_token, activity_data, force_update=false; update_description=true, shall_regnerate_overlay=true)
+function add_activity(user_id, access_token, activity_data, force_update=(time_diff)->false; update_description=true, shall_regnerate_overlay=true)
     start_time = activity_data[:start_date]
     activity_id = activity_data[:id]
     is_new_activity = download_activity(user_id, access_token, activity_id, start_time)
-    if !is_new_activity && !force_update
+    activity_path = joinpath(DATA_FOLDER, "activities", "$user_id", "$activity_id.json")
+    time_diff = Dates.unix2datetime(time()) - Dates.unix2datetime(mtime(activity_path))
+    if !is_new_activity && !force_update(time_diff)
         @info "The activity was already parsed at an earlier stage"
         return
     end
     
-    activity_path = joinpath(DATA_FOLDER, "activities", "$user_id", "$activity_id.json")
+    
     user_data = readjson(joinpath(DATA_FOLDER, "user_data", "$user_id.json"))
     city_data_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name]).jld2")
     city_walked_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.jld2")
@@ -228,7 +232,7 @@ function add_activity(user_id, access_token, activity_data, force_update=false; 
     save(city_walked_path, Dict("walked_parts" => data.walked_parts))
 end
 
-function add_activity(user_id, activity_id::Int, force_update=false; update_description=true)
+function add_activity(user_id, activity_id::Int, force_update=(time_diff)->false; update_description=true)
     access_token = get_access_token(user_id)
     activity_data = get_activity_data(access_token, activity_id)
     return add_activity(user_id, access_token, activity_data, force_update; update_description)
