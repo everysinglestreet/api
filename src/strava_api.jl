@@ -14,6 +14,7 @@ function get_access_token(user_id)
                     ["Content-Type" => "application/json"],
                     JSON3.write(payload))
 
+    r.status != 200 && @show r.status
     result = JSON3.read(String(r.body))
     return result[:access_token]
 end
@@ -24,6 +25,7 @@ function get_activity_data(access_token, activity_id)
     headers = Dict("Authorization" => "Bearer $access_token", "Content-Type" => "application/json")
 
     r = HTTP.request("GET", url, headers)
+    r.status != 200 && @show r.status
     json_result = JSON3.read(String(r.body))
     return json_result
 end
@@ -37,7 +39,8 @@ function download_activity(user_id, access_token, activity_id, start_time)
 
     headers = Dict("Authorization" => "Bearer $access_token", "Content-Type" => "application/json")
     r = HTTP.request("GET", url, headers)
-    
+    r.status != 200 && @show r.status
+
     result = copy(JSON3.read(String(r.body)))
     # convert the data into our own format
     save_data = Dict{Symbol, Any}()
@@ -66,6 +69,7 @@ function set_activity_fields(access_token, activity_id, payload)
                     headers,
                     JSON3.write(payload))
 
+    r.status != 200 && @show r.status
     result = JSON3.read(String(r.body))
     return result
 end
@@ -142,49 +146,51 @@ function regenerate_overlay(user_id)
     run_regenerate_overlay(user_id, user_data[:city_name])
 end
 
-function get_all_activity_ids(access_token)
-    ids = Int[]
+function get_all_activities(access_token)
+    activities = Any[]
 
     i = 1
     while i <= 1000
-        len_before = length(ids)
+        len_before = length(activities)
         url = "https://www.strava.com/api/v3/athlete/activities?per_page=30&page=$i"
 
         headers = Dict("Authorization" => "Bearer $access_token", "Content-Type" => "application/json")
 
         r = HTTP.request("GET", url, headers)
+        r.status != 200 && @show r.status
         json_result = JSON3.read(String(r.body))
         for res in json_result
-            push!(ids, res["id"])
+            push!(activities, res)
         end
-        if length(ids) == len_before
+        if length(activities) == len_before
             break
         end
         i += 1
     end
     
-    return ids
+    return activities
 end
 
 function full_update(user_id)
     access_token = get_access_token(user_id)
-    all_ids = get_all_activity_ids(access_token)
+    all_activities = get_all_activities(access_token)
+    @show length(all_activities)
     user_data = readjson(joinpath(DATA_FOLDER, "user_data", "$user_id.json"))
     walked_before = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.jld2")
     walked_old = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked_old.jld2")
-    mv(walked_before, walked_old)
+    mv(walked_before, walked_old; force=true)
     walked_parts = EverySingleStreet.WalkedParts(Dict{String, Vector{Int}}(), Dict{Int, EverySingleStreet.WalkedWay}())
     save(walked_before, Dict("walked_parts" => walked_parts))
-
-    for activity_id in all_ids
-        add_activity(user_id, activity_id, true; update_description=false)
+    for (i,activity_data) in enumerate(all_activities)
+        perc = i/length(all_activities)*100
+        @show perc
+        add_activity(user_id, access_token, activity_data, true; update_description=false, shall_regnerate_overlay=i % 10 == 0)
     end
 end
 
-function add_activity(user_id, activity_id, force_update=false; update_description=true)
-    access_token = get_access_token(user_id)
-    activity_data = get_activity_data(access_token, activity_id)
+function add_activity(user_id, access_token, activity_data, force_update=false; update_description=true, shall_regnerate_overlay=true)
     start_time = activity_data[:start_date]
+    activity_id = activity_data[:id]
     is_new_activity = download_activity(user_id, access_token, activity_id, start_time)
     if !is_new_activity && !force_update
         @info "The activity was already parsed at an earlier stage"
@@ -209,7 +215,7 @@ function add_activity(user_id, activity_id, force_update=false; update_descripti
     EverySingleStreet.create_xml(city_data_map.nodes, data.walked_parts, walked_xml_path; districts=city_data_map.districts, district_levels)
     @info "Finished creating xml"
 
-    run_regenerate_overlay(user_id, user_data[:city_name])
+    shall_regnerate_overlay && run_regenerate_overlay(user_id, user_data[:city_name])
 
     walked_road_kms_str = @sprintf "Walked road kms: %.2f km" data.this_walked_road_km
     added_kms_str = @sprintf "Added road kms: %.2f km" data.added_kms
@@ -220,6 +226,12 @@ function add_activity(user_id, activity_id, force_update=false; update_descripti
 
     update_description && prepend_activity_description(access_token, activity_data, desc)
     save(city_walked_path, Dict("walked_parts" => data.walked_parts))
+end
+
+function add_activity(user_id, activity_id::Int, force_update=false; update_description=true)
+    access_token = get_access_token(user_id)
+    activity_data = get_activity_data(access_token, activity_id)
+    return add_activity(user_id, access_token, activity_data, force_update; update_description)
 end
 
 function run_regenerate_overlay(user_id, city_name)
