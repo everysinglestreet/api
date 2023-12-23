@@ -36,7 +36,7 @@ end
 
 @post "/full_update" function(req::HTTP.Request)
     data = json(req)
-    @spawn full_update(data[:owner_id])
+    full_update(data[:owner_id])
     return "EVENT_RECEIVED"
 end
 
@@ -50,6 +50,11 @@ end
 @get "/districts" function(req::HTTP.Request)
     data = json(req)
     return get_district_statistics(data[:owner_id])
+end
+
+@get "/statistics" function(req::HTTP.Request)
+    data = json(req)
+    return get_statistics(data[:owner_id])
 end
 
 serve(host="0.0.0.0", port=8000)

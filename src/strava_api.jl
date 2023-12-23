@@ -108,6 +108,18 @@ function compare_statistics(before, after)
     return result_dict
 end
 
+function get_statistics(user_id)
+    user_data = readjson(joinpath(DATA_FOLDER, "user_data", "$user_id.json"))
+    city_data_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name]).jld2")
+    city_walked_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.jld2")
+    city_data = load(city_data_path)
+    city_data_map = city_data["no_graph_map"]
+    city_walked_parts = load(city_walked_path)["walked_parts"]
+    walked_road_km = EverySingleStreet.total_length(city_walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
+    road_km = EverySingleStreet.total_length(city_data_map; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
+    return (walked_road_km = walked_road_km, road_km = road_km, perc = walked_road_km / road_km * 100)
+end
+
 function get_district_statistics(user_id)
     user_data = readjson(joinpath(DATA_FOLDER, "user_data", "$user_id.json"))
     city_data_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name]).jld2")
@@ -204,7 +216,10 @@ function add_activity(user_id, access_token, activity_data, force_update=(time_d
         @info "The activity was already parsed at an earlier stage"
         return
     end
-    
+    # make it temporary to retry again if something failed
+    activity_path = joinpath(DATA_FOLDER, "activities", "$user_id", "$activity_id.json")
+    activity_path_tmp = joinpath(DATA_FOLDER, "activities", "$user_id", "$(activity_id)_tmp.json")
+    mv(activity_path, activity_path_tmp; force=true)
     
     user_data = readjson(joinpath(DATA_FOLDER, "user_data", "$user_id.json"))
     city_data_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name]).jld2")
@@ -213,7 +228,7 @@ function add_activity(user_id, access_token, activity_data, force_update=(time_d
     city_data_map = city_data["no_graph_map"]
     city_walked_parts = load(city_walked_path)["walked_parts"]
     statistics_before = calculate_statistics(city_data_map, city_walked_parts)
-    data = EverySingleStreet.map_matching(activity_path, city_data_map.ways, city_walked_parts, "tmp_local_map.json")
+    data = EverySingleStreet.map_matching(activity_path_tmp, city_data_map.ways, city_walked_parts, "tmp_local_map.json")
     @info "Finished map map_matching"
     statistics_after = calculate_statistics(city_data_map, data.walked_parts)
     rm("tmp_local_map.json")
@@ -234,6 +249,8 @@ function add_activity(user_id, access_token, activity_data, force_update=(time_d
 
     update_description && prepend_activity_description(access_token, activity_data, desc)
     save(city_walked_path, Dict("walked_parts" => data.walked_parts))
+    # everything worked so we can mark it as done
+    mv(activity_path_tmp, activity_path; force=true)
 end
 
 function add_activity(user_id, activity_id::Int, force_update=(time_diff)->false; update_description=true)
