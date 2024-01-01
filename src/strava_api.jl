@@ -30,11 +30,10 @@ function get_activity_data(access_token, activity_id)
     return json_result
 end
 
-download_activity(user_id::Int, activity_id) = download_activity(user_id, get_access_token(user_id), activity_id)
-
 function download_activity(user_id, access_token, activity_id, start_time)
     path = joinpath(DATA_FOLDER, "activities", "$user_id", "$activity_id.json")
     isfile(path) && return false
+
     url = "https://www.strava.com/api/v3/activities/$activity_id/streams?keys=latlng,time"
 
     headers = Dict("Authorization" => "Bearer $access_token", "Content-Type" => "application/json")
@@ -95,7 +94,7 @@ function compare_statistics(before, after)
     before_total_perc = before.walked_road_km / before.road_km * 100
     after_total_perc = after.walked_road_km / after.road_km * 100
     if floor(Int, after_total_perc) > floor(Int, before_total_perc)
-        result_dict[Symbol("Total: ")] = @sprintf "%.0f%%" after_total_perc
+        result_dict[Symbol("Total: ")] = @sprintf "> %.0f%%" floor(after_total_perc)
     end
     for (district, perc)  in after.district_percentages
         iszero(perc) && continue
@@ -115,9 +114,10 @@ function get_statistics(user_id)
     city_data = load(city_data_path)
     city_data_map = city_data["no_graph_map"]
     city_walked_parts = load(city_walked_path)["walked_parts"]
+    activity_path = joinpath(DATA_FOLDER, "activities", "$user_id")
     walked_road_km = EverySingleStreet.total_length(city_walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
     road_km = EverySingleStreet.total_length(city_data_map; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
-    return (walked_road_km = walked_road_km, road_km = road_km, perc = walked_road_km / road_km * 100)
+    return (walked_road_km = walked_road_km, road_km = road_km, perc = walked_road_km / road_km * 100, num_activities=length(readdir(activity_path)))
 end
 
 function get_district_statistics(user_id)
@@ -180,7 +180,7 @@ function get_all_activities(access_token)
         i += 1
     end
     
-    return activities
+    return reverse(activities)
 end
 
 function full_update(user_id)
@@ -193,7 +193,9 @@ function full_update(user_id)
     time_diff = Dates.unix2datetime(time()) - Dates.unix2datetime(mtime(walked_before))
     if time_diff > Hour(5)
         println("Moved old walked.jld2")
-        mv(walked_before, walked_old; force=true)
+        if isfile(walked_before)
+            mv(walked_before, walked_old; force=true)
+        end
         walked_parts = EverySingleStreet.WalkedParts(Dict{String, Vector{Int}}(), Dict{Int, EverySingleStreet.WalkedWay}())
         save(walked_before, Dict("walked_parts" => walked_parts))   
     end
@@ -206,12 +208,27 @@ function full_update(user_id)
     end
 end
 
+function save_activity_statistics(user_id, access_token, activity_id, data)
+    d = Dict{Symbol, Any}()
+    activity_data = get_activity_data(access_token, activity_id)
+    d[:strava_data] = activity_data
+    d[:added_km] = data.added_kms
+    d[:walked_road_km] = data.this_walked_road_km
+    path = joinpath(DATA_FOLDER, "statistics", "$user_id", "$activity_id.json")
+    mkpath(dirname(path))
+    open(path, "w") do io
+        JSON3.pretty(io, d)
+    end 
+end
+
 function add_activity(user_id, access_token, activity_data, force_update=(time_diff)->false; update_description=true, shall_regnerate_overlay=true)
     start_time = activity_data[:start_date]
     activity_id = activity_data[:id]
     is_new_activity = download_activity(user_id, access_token, activity_id, start_time)
     activity_path = joinpath(DATA_FOLDER, "activities", "$user_id", "$activity_id.json")
     time_diff = Dates.unix2datetime(time()) - Dates.unix2datetime(mtime(activity_path))
+    time_since_update = Dates.canonicalize(Dates.CompoundPeriod(time_diff))
+    !is_new_activity && println("Time since last update: $time_since_update")
     if !is_new_activity && !force_update(time_diff)
         @info "The activity was already parsed at an earlier stage"
         return
@@ -228,10 +245,11 @@ function add_activity(user_id, access_token, activity_data, force_update=(time_d
     city_data_map = city_data["no_graph_map"]
     city_walked_parts = load(city_walked_path)["walked_parts"]
     statistics_before = calculate_statistics(city_data_map, city_walked_parts)
-    data = EverySingleStreet.map_matching(activity_path_tmp, city_data_map.ways, city_walked_parts, "tmp_local_map.json")
+    data = EverySingleStreet.map_matching(activity_path_tmp, city_data_map, city_walked_parts, "tmp_local_map.json")
     @info "Finished map map_matching"
     statistics_after = calculate_statistics(city_data_map, data.walked_parts)
     rm("tmp_local_map.json")
+    save_activity_statistics(user_id, access_token, activity_id, data)
 
     walked_xml_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.xml")
     district_levels = get_district_levels(user_id)
@@ -251,6 +269,8 @@ function add_activity(user_id, access_token, activity_data, force_update=(time_d
     save(city_walked_path, Dict("walked_parts" => data.walked_parts))
     # everything worked so we can mark it as done
     mv(activity_path_tmp, activity_path; force=true)
+    touch(activity_path) # update mtime
+    GC.gc()
 end
 
 function add_activity(user_id, activity_id::Int, force_update=(time_diff)->false; update_description=true)
