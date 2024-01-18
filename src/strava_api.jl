@@ -204,7 +204,14 @@ function full_update(user_id)
         @show perc
         shall_regnerate_overlay = i % 10 == 0
         shall_regnerate_overlay |= i == length(all_activities)
-        add_activity(user_id, access_token, activity_data, >(Hour(5)); update_description=false, shall_regnerate_overlay)
+        start_time_str = activity_data[:start_date]
+        df = dateformat"y-m-d"
+        start_time = Date(start_time_str[1:10], df)
+        # if year(start_time) < 2024
+            add_activity(user_id, access_token, activity_data, >(Hour(5)); update_description=false, shall_regnerate_overlay)
+        # else 
+            # println("Skipped as not done in 2023 or before")
+        # end
     end
 end
 
@@ -221,23 +228,26 @@ function save_activity_statistics(user_id, access_token, activity_id, data)
     end 
 end
 
+function get_estimate_eoy(perc, boy=20.128365843493164)
+    this_year = perc - boy
+    days_so_far =  Dates.dayofyear(Dates.now())
+    days_total = Dates.dayofyear(Dates.Date("2024-12-31"))
+    return boy + this_year / days_so_far * days_total
+end
+
 function add_activity(user_id, access_token, activity_data, force_update=(time_diff)->false; update_description=true, shall_regnerate_overlay=true)
     start_time = activity_data[:start_date]
     activity_id = activity_data[:id]
     is_new_activity = download_activity(user_id, access_token, activity_id, start_time)
-    activity_path = joinpath(DATA_FOLDER, "activities", "$user_id", "$activity_id.json")
-    time_diff = Dates.unix2datetime(time()) - Dates.unix2datetime(mtime(activity_path))
+    statistics_path = joinpath(DATA_FOLDER, "statistics", "$user_id", "$activity_id.json")
+    activity_path_tmp = joinpath(DATA_FOLDER, "activities", "$user_id", "$(activity_id).json")
+    time_diff = Dates.unix2datetime(time()) - Dates.unix2datetime(mtime(statistics_path))
     time_since_update = Dates.canonicalize(Dates.CompoundPeriod(time_diff))
     !is_new_activity && println("Time since last update: $time_since_update")
     if !is_new_activity && !force_update(time_diff)
         @info "The activity was already parsed at an earlier stage"
         return
     end
-    # make it temporary to retry again if something failed
-    activity_path = joinpath(DATA_FOLDER, "activities", "$user_id", "$activity_id.json")
-    activity_path_tmp = joinpath(DATA_FOLDER, "activities", "$user_id", "$(activity_id)_tmp.json")
-    mv(activity_path, activity_path_tmp; force=true)
-    
     user_data = readjson(joinpath(DATA_FOLDER, "user_data", "$user_id.json"))
     city_data_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name]).jld2")
     city_walked_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.jld2")
@@ -249,7 +259,7 @@ function add_activity(user_id, access_token, activity_data, force_update=(time_d
     @info "Finished map map_matching"
     statistics_after = calculate_statistics(city_data_map, data.walked_parts)
     rm("tmp_local_map.json")
-    save_activity_statistics(user_id, access_token, activity_id, data)
+    
 
     walked_xml_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.xml")
     district_levels = get_district_levels(user_id)
@@ -261,15 +271,16 @@ function add_activity(user_id, access_token, activity_data, force_update=(time_d
     walked_road_kms_str = @sprintf "Walked road kms: %.2f km" data.this_walked_road_km
     added_kms_str = @sprintf "Added road kms: %.2f km" data.added_kms
     desc = "$walked_road_kms_str\n$added_kms_str"
+    est_eoy = get_estimate_eoy(statistics_after.walked_road_km / statistics_after.road_km * 100)
+    est_eoy_str = @sprintf "Est. EOY: %.1f%%" est_eoy
+    desc = "$desc\n$est_eoy_str"
     for (key, value) in compare_statistics(statistics_before, statistics_after)
         desc = "$desc\n$key $value"
     end
 
     update_description && prepend_activity_description(access_token, activity_data, desc)
     save(city_walked_path, Dict("walked_parts" => data.walked_parts))
-    # everything worked so we can mark it as done
-    mv(activity_path_tmp, activity_path; force=true)
-    touch(activity_path) # update mtime
+    save_activity_statistics(user_id, access_token, activity_id, data)
     GC.gc()
 end
 
