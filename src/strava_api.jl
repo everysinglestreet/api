@@ -235,12 +235,25 @@ function get_estimate_eoy(perc, boy=20.128365843493164)
     return boy + this_year / days_so_far * days_total
 end
 
+function get_activity_map_matching(user_id, access_token, activity_data; walked_parts=EverySingleStreet.WalkedParts())
+    user_data = readjson(joinpath(DATA_FOLDER, "user_data", "$user_id.json"))
+    city_data_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name]).jld2")
+    city_data = load(city_data_path)
+    city_data_map = city_data["no_graph_map"]
+    start_time = activity_data[:start_date]
+    activity_id = activity_data[:id]
+    download_activity(user_id, access_token, activity_id, start_time)
+    activity_path_tmp = joinpath(DATA_FOLDER, "activities", "$user_id", "$(activity_id).json")
+    gps_points = EverySingleStreet.get_gps_points(activity_path_tmp)
+    mm_data = EverySingleStreet.map_matching(activity_path_tmp, city_data_map, walked_parts, "tmp_local_map.json")
+    return (gps_points=gps_points, map_matched_data=mm_data)
+end
+
 function add_activity(user_id, access_token, activity_data, force_update=(time_diff)->false; update_description=true, shall_regnerate_overlay=true)
     start_time = activity_data[:start_date]
     activity_id = activity_data[:id]
     is_new_activity = download_activity(user_id, access_token, activity_id, start_time)
     statistics_path = joinpath(DATA_FOLDER, "statistics", "$user_id", "$activity_id.json")
-    activity_path_tmp = joinpath(DATA_FOLDER, "activities", "$user_id", "$(activity_id).json")
     time_diff = Dates.unix2datetime(time()) - Dates.unix2datetime(mtime(statistics_path))
     time_since_update = Dates.canonicalize(Dates.CompoundPeriod(time_diff))
     !is_new_activity && println("Time since last update: $time_since_update")
@@ -255,11 +268,13 @@ function add_activity(user_id, access_token, activity_data, force_update=(time_d
     city_data_map = city_data["no_graph_map"]
     city_walked_parts = load(city_walked_path)["walked_parts"]
     statistics_before = calculate_statistics(city_data_map, city_walked_parts)
-    data = EverySingleStreet.map_matching(activity_path_tmp, city_data_map, city_walked_parts, "tmp_local_map.json")
+    map_matching_data = get_activity_map_matching(user_id, access_token, activity_data; walked_parts=city_walked_parts)
+    data = map_matching_data.map_matched_data
     @info "Finished map map_matching"
     statistics_after = calculate_statistics(city_data_map, data.walked_parts)
     rm("tmp_local_map.json")
-    
+    last_info_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_last_walk.jld2")
+    save(last_info_path, Dict("gps_points" => map_matching_data.gps_points, "activity_id" => activity_id, "this_walked_parts" => data.this_walked_parts))
 
     walked_xml_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.xml")
     district_levels = get_district_levels(user_id)
@@ -312,4 +327,38 @@ function run_regenerate_overlay(user_id, city_name)
     if !json_response["metadata"]["success"]
         @show response
     end
+end
+
+function get_last_activity(access_token)
+    url = "https://www.strava.com/api/v3/athlete/activities?per_page=1"
+
+    headers = Dict("Authorization" => "Bearer $access_token", "Content-Type" => "application/json")
+
+    r = HTTP.request("GET", url, headers)
+    r.status != 200 && @show r.status
+    json_result = JSON3.read(String(r.body))
+    for res in json_result
+        return res
+    end
+    
+    return nothing
+end
+
+function get_last_image_path(params)
+    user_id = params["user_id"]
+    user_data = readjson(joinpath(DATA_FOLDER, "user_data", "$user_id.json"))
+    last_info_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_last_walk.jld2")
+    if !isfile(last_info_path)
+        access_token = get_access_token(user_id)
+        activity = get_last_activity(access_token)
+        nt = get_activity_map_matching(user_id, access_token, activity)
+        save(last_info_path, Dict("gps_points" => nt.gps_points, "activity_id" => activity[:id], "this_walked_parts" => nt.map_matched_data.this_walked_parts))
+    end
+    last_info = load(last_info_path)
+    fname = joinpath(DATA_FOLDER, "images", "$user_id", "last.png")
+    color = get(params, "color", "black")
+    line_width = parse(Float64, get(params, "line_width", "7"))
+    gps_opacity = parse(Float64, get(params, "gps_opacity", "0.4"))
+    EverySingleStreet.draw(last_info["this_walked_parts"], last_info["gps_points"], fname; color, gps_opacity, line_width)
+    return fname
 end
