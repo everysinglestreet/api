@@ -188,31 +188,25 @@ function full_update(user_id)
     all_activities = get_all_activities(access_token)
     @show length(all_activities)
     user_data = readjson(joinpath(DATA_FOLDER, "user_data", "$user_id.json"))
-    walked_before = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.jld2")
-    walked_old = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked_old.jld2")
-    time_diff = Dates.unix2datetime(time()) - Dates.unix2datetime(mtime(walked_before))
-    if time_diff > Hour(5)
-        println("Moved old walked.jld2")
-        if isfile(walked_before)
-            mv(walked_before, walked_old; force=true)
-        end
-        walked_parts = EverySingleStreet.WalkedParts(Dict{String, Vector{Int}}(), Dict{Int, EverySingleStreet.WalkedWay}())
-        save(walked_before, Dict("walked_parts" => walked_parts))   
-    end
+    city_data_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name]).jld2")
+    
+    city_data = load(city_data_path)
+    city_data_map = city_data["no_graph_map"]
+    walked_parts = EverySingleStreet.WalkedParts(Dict{String, Vector{Int}}(), Dict{Int, EverySingleStreet.WalkedWay}())
     for (i,activity_data) in enumerate(all_activities)
         perc = i/length(all_activities)*100
         @show perc
         shall_regnerate_overlay = i % 10 == 0
         shall_regnerate_overlay |= i == length(all_activities)
-        start_time_str = activity_data[:start_date]
-        df = dateformat"y-m-d"
-        start_time = Date(start_time_str[1:10], df)
-        # if year(start_time) < 2024
-            add_activity(user_id, access_token, activity_data, >(Hour(5)); update_description=false, shall_regnerate_overlay)
-        # else 
-            # println("Skipped as not done in 2023 or before")
-        # end
+        @time map_matching_data = get_activity_map_matching(user_id, access_token, activity_data; walked_parts=walked_parts)
+        walked_parts = map_matching_data.map_matched_data.walked_parts
     end
+    println("Saving everything")
+    city_walked_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.jld2")
+    save(city_walked_path, Dict("walked_parts" => walked_parts))
+    walked_xml_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(user_data[:city_name])_walked.xml")
+    district_levels = get_district_levels(user_id)
+    EverySingleStreet.create_xml(city_data_map.nodes, walked_parts, walked_xml_path; districts=city_data_map.districts, district_levels)
 end
 
 function save_activity_statistics(user_id, access_token, activity_id, data)
