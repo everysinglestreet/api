@@ -355,10 +355,11 @@ function get_last_image_path(params)
         save(last_info_path, Dict("gps_points" => nt.gps_points, "activity_id" => activity[:id], "this_walked_parts" => nt.map_matched_data.this_walked_parts))
     end
     last_info = load(last_info_path)
-    fname = joinpath(DATA_FOLDER, "images", "$user_id", "last.png")
+    fpath = joinpath(DATA_FOLDER, "images", "$user_id", "last.png")
+    fpath_return = joinpath("images", "$user_id", "last.png")
     color = get(params, "color", "black")
     line_width = parse(Float64, get(params, "line_width", "7"))
     gps_opacity = parse(Float64, get(params, "gps_opacity", "0.4"))
-    EverySingleStreet.draw(last_info["this_walked_parts"], last_info["gps_points"], fname; color, gps_opacity, line_width)
-    return fname
+    EverySingleStreet.draw(last_info["this_walked_parts"], last_info["gps_points"], fpath; color, gps_opacity, line_width)
+    return fpath_return
 end

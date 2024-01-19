@@ -61,7 +61,7 @@ end
     params = queryparams(req)
     fname = get_last_image_path(params)
     html("""
-        <img src="$fname" />
+        <img src="./data/$fname" />
     """)
 end
 
