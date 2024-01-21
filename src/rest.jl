@@ -60,9 +60,7 @@ end
 @get "/last_image" function(req::HTTP.Request)
     params = queryparams(req)
     fname = get_last_image_path(params)
-    html("""
-        <img src="./data/$fname" />
-    """)
+    file("./data/$fname")
 end
 
 dynamicfiles(joinpath(DATA_FOLDER, "images"), "/data/images")
