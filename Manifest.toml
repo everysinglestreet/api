@@ -25,9 +25,9 @@ version = "0.1.35"
 
 [[deps.Adapt]]
 deps = ["LinearAlgebra", "Requires"]
-git-tree-sha1 = "cde29ddf7e5726c9fb511f340244ea3481267608"
+git-tree-sha1 = "0fb305e0253fd4e833d486914367a2ee2c2e78d0"
 uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
-version = "3.7.2"
+version = "4.0.1"
 weakdeps = ["StaticArrays"]
 
     [deps.Adapt.extensions]
@@ -263,7 +263,7 @@ version = "2.2.4+0"
 
 [[deps.EverySingleStreet]]
 deps = ["Accessors", "DataFrames", "DataStructures", "Dates", "Distributions", "FileIO", "GeoInterface", "GeoJSON", "Geodesy", "GeometryBasics", "Graphs", "HMMBase", "JLD2", "JSON3", "LightOSM", "LightXML", "LinearAlgebra", "Luxor", "NearestNeighbors", "OrderedCollections", "PolygonInbounds", "Preferences", "ProgressMeter", "Shapefile", "SparseArrays", "StaticGraphs", "Statistics", "TimeZones", "Unitful"]
-git-tree-sha1 = "cf4ba4e6c9b28835f3a9160214f36fa47c7b0213"
+git-tree-sha1 = "bed608dd066e5327bf1724c7c5d245509dec94cc"
 repo-rev = "feature-draw"
 repo-url = "https://github.com/Wikunia/EverySingleStreet.jl"
 uuid = "9a55513a-1f47-4b8f-a8c7-9585ec10e442"
@@ -354,9 +354,9 @@ uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
 [[deps.GPUArraysCore]]
 deps = ["Adapt"]
-git-tree-sha1 = "2d6ca471a6c7b536127afccfa7564b5b39227fe0"
+git-tree-sha1 = "ec632f177c0d990e64d955ccc1b8c04c485a0950"
 uuid = "46192b85-c4d5-4398-a991-12ede77f4527"
-version = "0.1.5"
+version = "0.1.6"
 
 [[deps.GeoFormatTypes]]
 git-tree-sha1 = "59107c179a586f0fe667024c5eb7033e81333271"
@@ -829,9 +829,9 @@ version = "1.6.3"
 
 [[deps.Oxygen]]
 deps = ["DataStructures", "Dates", "HTTP", "JSON3", "MIMEs", "Reexport", "RelocatableFolders", "Requires", "Sockets", "Statistics", "Suppressor"]
-git-tree-sha1 = "8947a98a4727ba721bd5f1ee98c905159ea7ff48"
+git-tree-sha1 = "f69d7ae1dcf5d45bbfafb3eefcfb3c3393c97892"
 uuid = "df9a0d86-3283-4920-82dc-4555fc0d1d8b"
-version = "1.4.3"
+version = "1.4.4"
 
 [[deps.PCRE2_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -1123,9 +1123,9 @@ version = "0.3.4"
 
 [[deps.StructArrays]]
 deps = ["Adapt", "ConstructionBase", "DataAPI", "GPUArraysCore", "StaticArraysCore", "Tables"]
-git-tree-sha1 = "0a3db38e4cce3c54fe7a71f831cd7b6194a54213"
+git-tree-sha1 = "1b0b1205a56dc288b71b1961d48e351520702e24"
 uuid = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
-version = "0.6.16"
+version = "0.6.17"
 
 [[deps.StructTypes]]
 deps = ["Dates", "UUIDs"]
