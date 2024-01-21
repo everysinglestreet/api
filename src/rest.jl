@@ -60,9 +60,8 @@ end
 @get "/last_image" function(req::HTTP.Request)
     params = queryparams(req)
     fname = get_last_image_path(params)
-    file("./data/$fname")
+    file(fname)
 end
 
-dynamicfiles(joinpath(DATA_FOLDER, "images"), "/data/images")
 
 serve(host="0.0.0.0", port=8000)
