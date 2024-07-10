@@ -33,6 +33,11 @@ end
     return "EVENT_RECEIVED"
 end
 
+@post "/add_city" function(req::HTTP.Request)
+    data = json(req)
+    add_city(data[:owner_id], data[:long_name], data[:short_name])
+    return "CITY_ADDED"
+end
 
 @post "/full_update" function(req::HTTP.Request)
     data = json(req)
@@ -49,7 +54,7 @@ end
 
 @get "/districts" function(req::HTTP.Request)
     data = json(req)
-    return get_district_statistics(data[:owner_id])
+    return get_district_statistics(data[:owner_id], data[:city_name])
 end
 
 @get "/statistics" function(req::HTTP.Request)
