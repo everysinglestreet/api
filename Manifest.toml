@@ -261,8 +261,8 @@ version = "2.2.4+0"
 
 [[deps.EverySingleStreet]]
 deps = ["Accessors", "DataFrames", "DataStructures", "Dates", "Distributions", "FileIO", "GeoInterface", "GeoJSON", "Geodesy", "GeometryBasics", "Graphs", "HMMBase", "JLD2", "JSON3", "LightOSM", "LightXML", "LinearAlgebra", "Luxor", "NearestNeighbors", "OrderedCollections", "PolygonInbounds", "Preferences", "ProgressMeter", "Shapefile", "SparseArrays", "StaticGraphs", "Statistics", "TimeZones", "Unitful"]
-git-tree-sha1 = "89c75e40cae8aa9e06365873113bcb10137afc68"
-repo-rev = "feature-draw"
+git-tree-sha1 = "291f478e67c5e6c929ad8e15e2467e7af819e965"
+repo-rev = "main"
 repo-url = "https://github.com/Wikunia/EverySingleStreet.jl"
 uuid = "9a55513a-1f47-4b8f-a8c7-9585ec10e442"
 version = "0.1.0"
