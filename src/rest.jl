@@ -41,14 +41,22 @@ end
 
 @post "/full_update" function(req::HTTP.Request)
     data = json(req)
-    full_update(data[:owner_id])
+    if haskey(data, :city_name)
+        full_update(data[:owner_id], data[:city_name])
+    else
+        full_update(data[:owner_id])
+    end
     return "EVENT_RECEIVED"
 end
 
 
 @post "/regenerateOverlay" function(req::HTTP.Request)
     data = json(req)
-    regenerate_overlay(data[:owner_id])
+    if haskey(data, :city_name)
+        run_regenerate_overlay(data[:owner_id], data[:city_name])
+    else
+        regenerate_overlay(data[:owner_id])
+    end
     return Dict(:success => true)
 end
 
