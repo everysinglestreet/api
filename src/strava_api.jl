@@ -278,6 +278,10 @@ function add_activity(user_id, access_token, activity_data, city_name; update_de
     map_matching_data = get_activity_map_matching(user_id, access_token, activity_data, city_name; walked_parts=city_walked_parts)
     data = map_matching_data.map_matched_data
     @info "Finished map map_matching"
+    if iszero(data.this_walked_road_km)
+        @info "No kms added"
+        return
+    end
     statistics_after = calculate_statistics(city_data_map, data.walked_parts)
     rm("tmp_local_map.json")
     last_info_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(city_name)_last_walk.jld2")
