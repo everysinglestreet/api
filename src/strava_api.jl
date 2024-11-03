@@ -212,17 +212,21 @@ function full_update(user_id, city_name)
     access_token = get_access_token(user_id)
     all_activities = get_all_activities(access_token)
     @show length(all_activities)
-    user_data = readjson(joinpath(DATA_FOLDER, "user_data", "$user_id.json"))
     city_data_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(city_name).jld2")
     
     city_data = load(city_data_path)
     city_data_map = city_data["no_graph_map"]
     walked_parts = EverySingleStreet.WalkedParts(Dict{String, Vector{Int}}(), Dict{Int, EverySingleStreet.WalkedWay}())
+  
+    # rate limit assumption: Only gets hit for this full update
+    ratelimit = 90
+    ratetime = Minute(15)
+    request_count, last_reset = 0, now()
+
     for (i,activity_data) in enumerate(all_activities)
+        request_count, last_reset = wait_rate_limit_check(request_count, ratelimit, ratetime, last_reset)
         perc = i/length(all_activities)*100
         @show perc
-        shall_regnerate_overlay = i % 10 == 0
-        shall_regnerate_overlay |= i == length(all_activities)
         @time map_matching_data = get_activity_map_matching(user_id, access_token, activity_data, city_name; walked_parts=walked_parts)
         walked_parts = map_matching_data.map_matched_data.walked_parts
     end
@@ -232,6 +236,17 @@ function full_update(user_id, city_name)
     walked_xml_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(city_name)_walked.xml")
     district_levels = get_district_levels(user_id, city_name)
     EverySingleStreet.create_xml(city_data_map.nodes, walked_parts, walked_xml_path; districts=city_data_map.districts, district_levels)
+end
+
+function wait_rate_limit_check(request_count, ratelimit, ratetime, last_reset)
+    if request_count >= ratelimit
+        wait_time = last_reset + ratetime - now()
+        @warn "Rate limit reached, sleeping for $wait_time..."
+        sleep(ceil(Int, wait_time))
+        request_count = 0
+        last_reset = now()
+    end
+    return request_count, last_reset
 end
 
 function save_activity_statistics(user_id, access_token, activity_id, data)
