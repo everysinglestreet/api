@@ -70,6 +70,11 @@ end
     return get_statistics(data[:owner_id])
 end
 
+@get "/activity_statistics" function(req::HTTP.Request)
+    data = json(req)
+    return get_activity_statistics(data[:owner_id])
+end
+
 @get "/last_image" function(req::HTTP.Request)
     params = queryparams(req)
     fname = get_last_image_path(params)

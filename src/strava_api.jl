@@ -19,7 +19,10 @@ function get_access_token(user_id)
     return result[:access_token]
 end
 
-function get_activity_data(access_token, activity_id)
+function get_activity_data(user_id, access_token, activity_id)
+    path = joinpath(DATA_FOLDER, "activities", "$user_id", "data", "$activity_id.json")
+    isfile(path) && return false, readjson(path)
+
     url = "https://www.strava.com/api/v3/activities/$activity_id"
 
     headers = Dict("Authorization" => "Bearer $access_token", "Content-Type" => "application/json")
@@ -27,11 +30,14 @@ function get_activity_data(access_token, activity_id)
     r = HTTP.request("GET", url, headers)
     r.status != 200 && @show r.status
     json_result = JSON3.read(String(r.body))
-    return json_result
+    open(path, "w") do f
+        JSON3.write(f, json_result)
+    end
+    return true, json_result
 end
 
 function download_activity(user_id, access_token, activity_id, start_time)
-    path = joinpath(DATA_FOLDER, "activities", "$user_id", "$activity_id.json")
+    path = joinpath(DATA_FOLDER, "activities", "$user_id", "gps", "$activity_id.json")
     isfile(path) && return false
 
     url = "https://www.strava.com/api/v3/activities/$activity_id/streams?keys=latlng,time"
@@ -107,6 +113,75 @@ function compare_statistics(before, after)
     return result_dict
 end
 
+
+"""
+    get_activity_statistics(user_id)
+
+Return statistics for each activity as a dict. Here the representation in json.
+```json
+{
+    "2024": {
+        "12": {
+            "activities": [
+                {
+                "activity_id": ...,
+                "start_time": ...,
+                "distance": ...,
+                "moving_time": ...,
+                "road_kms": ...,
+                "new_road_kms": ...
+                }
+            ],
+            "summary": {
+                "distance": ...,
+                "moving_time": ...,
+                "road_kms": ...,
+                "new_road_kms": ...
+            }
+    ]
+}
+```
+"""
+function get_activity_statistics(user_id)
+    stats_path = joinpath(DATA_FOLDER, "statistics", "$user_id")
+    statistics_files = readdir(stats_path)
+    data = Dict{Int, Dict{Int, Any}}()
+    for filename in statistics_files 
+        json = readjson(joinpath(stats_path, filename))
+        strava_data = json[:strava_data]
+        start_time = strava_data[:start_date_local]
+        start_dt = DateTime(start_time, "yyyy-mm-ddTHH:MM:SS\\Z")
+        year = Dates.year(start_dt)
+        month = Dates.month(start_dt)
+        if !haskey(data, year)
+            data[year] = Dict{Symbol, Any}()
+        end
+        if !haskey(data[year], month)
+            data[year][month] = Dict{Symbol, Any}(
+                :activities => Vector{Dict{Symbol, Any}}(),
+                :summary => Dict{Symbol, Any}(
+                    :distance => 0.0,
+                    :moving_time => 0.0,
+                    :road_kms => 0.0,
+                    :new_road_kms => 0.0
+                ),
+            )
+        end
+        current_data = Dict{Symbol, Any}()
+        current_data[:activity_id] = strava_data[:id]
+        current_data[:start_time] = start_time
+        current_data[:distance] = strava_data[:distance] / 1000
+        current_data[:moving_time] = strava_data[:moving_time]
+        current_data[:road_kms] = json[:walked_road_km]
+        current_data[:new_road_kms] = json[:added_km]
+        for key in keys(data[year][month][:summary])
+            data[year][month][:summary][key] += current_data[key]
+        end
+        push!(data[year][month][:activities], current_data)
+    end
+    return data
+end
+
 function get_statistics(user_id)
     user_data = readjson(joinpath(DATA_FOLDER, "user_data", "$user_id.json"))
     city_names = user_data[:city_names]
@@ -115,7 +190,7 @@ function get_statistics(user_id)
         city_stats = get_statistics(user_id, city_name)
         stats[:cities][city_name] = city_stats
     end
-    activity_path = joinpath(DATA_FOLDER, "activities", "$user_id")
+    activity_path = joinpath(DATA_FOLDER, "activities", "gps", "$user_id")
     num_activities=length(readdir(activity_path))
     stats[:misc] = Dict{Symbol, Any}()
     stats[:misc][:num_activities] = num_activities
@@ -219,7 +294,7 @@ function full_update(user_id, city_name)
     walked_parts = EverySingleStreet.WalkedParts(Dict{String, Vector{Int}}(), Dict{Int, EverySingleStreet.WalkedWay}())
   
     # rate limit assumption: Only gets hit for this full update
-    ratelimit = 90
+    ratelimit = 80
     ratetime = Minute(15)
     request_count, last_reset = 0, now()
 
@@ -228,7 +303,12 @@ function full_update(user_id, city_name)
         perc = i/length(all_activities)*100
         @show perc
         @time map_matching_data = get_activity_map_matching(user_id, access_token, activity_data, city_name; walked_parts=walked_parts)
+        map_matching_data.needed_download && (request_count += 1)
         walked_parts = map_matching_data.map_matched_data.walked_parts
+        request_count, last_reset = wait_rate_limit_check(request_count, ratelimit, ratetime, last_reset)
+        needed_request = save_activity_statistics(user_id, access_token, activity_data[:id], map_matching_data.map_matched_data)
+        needed_request && (request_count += 1)
+        @show request_count
     end
     println("Saving everything")
     city_walked_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(city_name)_walked.jld2")
@@ -241,8 +321,11 @@ end
 function wait_rate_limit_check(request_count, ratelimit, ratetime, last_reset)
     if request_count >= ratelimit
         wait_time = last_reset + ratetime - now()
-        @warn "Rate limit reached, sleeping for $wait_time..."
-        sleep(ceil(Int, wait_time))
+        seconds = Dates.value(wait_time)/1000
+        if seconds > 0
+            @warn "Rate limit reached, sleeping for $(Dates.canonicalize(wait_time))..."
+            sleep(Dates.value(wait_time)/1000)
+        end
         request_count = 0
         last_reset = now()
     end
@@ -251,7 +334,7 @@ end
 
 function save_activity_statistics(user_id, access_token, activity_id, data)
     d = Dict{Symbol, Any}()
-    activity_data = get_activity_data(access_token, activity_id)
+    needed_download, activity_data = get_activity_data(user_id, access_token, activity_id)
     d[:strava_data] = activity_data
     d[:added_km] = data.added_kms
     d[:walked_road_km] = data.this_walked_road_km
@@ -260,6 +343,7 @@ function save_activity_statistics(user_id, access_token, activity_id, data)
     open(path, "w") do io
         JSON3.pretty(io, d)
     end 
+    return needed_download
 end
 
 function get_estimate_eoy(perc, boy=20.128365843493164)
@@ -275,11 +359,11 @@ function get_activity_map_matching(user_id, access_token, activity_data, city_na
     city_data_map = city_data["no_graph_map"]
     start_time = activity_data[:start_date]
     activity_id = activity_data[:id]
-    download_activity(user_id, access_token, activity_id, start_time)
-    activity_path_tmp = joinpath(DATA_FOLDER, "activities", "$user_id", "$(activity_id).json")
+    needed_download = download_activity(user_id, access_token, activity_id, start_time)
+    activity_path_tmp = joinpath(DATA_FOLDER, "activities", "$user_id", "gps", "$(activity_id).json")
     gps_points = EverySingleStreet.get_gps_points(activity_path_tmp)
     mm_data = EverySingleStreet.map_matching(activity_path_tmp, city_data_map, walked_parts, "tmp_local_map.json")
-    return (gps_points=gps_points, map_matched_data=mm_data)
+    return (gps_points=gps_points, map_matched_data=mm_data, needed_download=needed_download)
 end
 
 function add_activity(user_id, access_token, activity_data, city_name; update_description=true, shall_regnerate_overlay=true)
@@ -327,7 +411,7 @@ end
 
 function add_activity(user_id, activity_id::Int, force_update=(time_diff)->false; update_description=true)
     access_token = get_access_token(user_id)
-    activity_data = get_activity_data(access_token, activity_id)
+    needed_download, activity_data = get_activity_data(user_id, access_token, activity_id)
     user_data = readjson(joinpath(DATA_FOLDER, "user_data", "$user_id.json"))
     start_time = activity_data[:start_date]
     activity_id = activity_data[:id]
