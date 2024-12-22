@@ -15,6 +15,7 @@ function get_access_token(user_id)
                     JSON3.write(payload))
 
     r.status != 200 && @show r.status
+    wait_rate_limit(r.headers)
     result = JSON3.read(String(r.body))
     return result[:access_token]
 end
@@ -29,6 +30,7 @@ function get_activity_data(user_id, access_token, activity_id)
 
     r = HTTP.request("GET", url, headers)
     r.status != 200 && @show r.status
+    wait_rate_limit(r.headers)
     json_result = JSON3.read(String(r.body))
     open(path, "w") do f
         JSON3.write(f, json_result)
@@ -45,7 +47,7 @@ function download_activity(user_id, access_token, activity_id, start_time)
     headers = Dict("Authorization" => "Bearer $access_token", "Content-Type" => "application/json")
     r = HTTP.request("GET", url, headers)
     r.status != 200 && @show r.status
-
+    wait_rate_limit(r.headers)
     result = copy(JSON3.read(String(r.body)))
     # convert the data into our own format
     save_data = Dict{Symbol, Any}()
@@ -190,7 +192,7 @@ function get_statistics(user_id)
         city_stats = get_statistics(user_id, city_name)
         stats[:cities][city_name] = city_stats
     end
-    activity_path = joinpath(DATA_FOLDER, "activities", "gps", "$user_id")
+    activity_path = joinpath(DATA_FOLDER, "activities", "$user_id", "gps")
     num_activities=length(readdir(activity_path))
     stats[:misc] = Dict{Symbol, Any}()
     stats[:misc][:num_activities] = num_activities
@@ -260,6 +262,7 @@ function get_all_activities(access_token)
 
         r = HTTP.request("GET", url, headers)
         r.status != 200 && @show r.status
+        wait_rate_limit(r.headers)
         json_result = JSON3.read(String(r.body))
         for res in json_result
             push!(activities, res)
@@ -293,22 +296,12 @@ function full_update(user_id, city_name)
     city_data_map = city_data["no_graph_map"]
     walked_parts = EverySingleStreet.WalkedParts(Dict{String, Vector{Int}}(), Dict{Int, EverySingleStreet.WalkedWay}())
   
-    # rate limit assumption: Only gets hit for this full update
-    ratelimit = 80
-    ratetime = Minute(15)
-    request_count, last_reset = 0, now()
-
     for (i,activity_data) in enumerate(all_activities)
-        request_count, last_reset = wait_rate_limit_check(request_count, ratelimit, ratetime, last_reset)
         perc = i/length(all_activities)*100
         @show perc
         @time map_matching_data = get_activity_map_matching(user_id, access_token, activity_data, city_name; walked_parts=walked_parts)
-        map_matching_data.needed_download && (request_count += 1)
         walked_parts = map_matching_data.map_matched_data.walked_parts
-        request_count, last_reset = wait_rate_limit_check(request_count, ratelimit, ratetime, last_reset)
-        needed_request = save_activity_statistics(user_id, access_token, activity_data[:id], map_matching_data.map_matched_data)
-        needed_request && (request_count += 1)
-        @show request_count
+        save_activity_statistics(user_id, access_token, activity_data[:id], map_matching_data.map_matched_data)
     end
     println("Saving everything")
     city_walked_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(city_name)_walked.jld2")
@@ -316,20 +309,6 @@ function full_update(user_id, city_name)
     walked_xml_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(city_name)_walked.xml")
     district_levels = get_district_levels(user_id, city_name)
     EverySingleStreet.create_xml(city_data_map.nodes, walked_parts, walked_xml_path; districts=city_data_map.districts, district_levels)
-end
-
-function wait_rate_limit_check(request_count, ratelimit, ratetime, last_reset)
-    if request_count >= ratelimit
-        wait_time = last_reset + ratetime - now()
-        seconds = Dates.value(wait_time)/1000
-        if seconds > 0
-            @warn "Rate limit reached, sleeping for $(Dates.canonicalize(wait_time))..."
-            sleep(Dates.value(wait_time)/1000)
-        end
-        request_count = 0
-        last_reset = now()
-    end
-    return request_count, last_reset
 end
 
 function save_activity_statistics(user_id, access_token, activity_id, data)
@@ -461,6 +440,7 @@ function get_last_activity(access_token)
 
     r = HTTP.request("GET", url, headers)
     r.status != 200 && @show r.status
+    wait_rate_limit(r.headers)
     json_result = JSON3.read(String(r.body))
     for res in json_result
         return res
