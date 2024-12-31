@@ -325,10 +325,10 @@ function save_activity_statistics(user_id, access_token, activity_id, data)
     return needed_download
 end
 
-function get_estimate_eoy(perc, boy=20.128365843493164)
+function get_estimate_eoy(perc, boy=37.28391636651081)
     this_year = perc - boy
     days_so_far =  Dates.dayofyear(Dates.now())
-    days_total = Dates.dayofyear(Dates.Date("2024-12-31"))
+    days_total = Dates.dayofyear(Dates.Date("2025-12-31"))
     return boy + this_year / days_so_far * days_total
 end
 
