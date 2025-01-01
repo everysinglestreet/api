@@ -469,17 +469,9 @@ function get_last_image_path(params)
 end
 
 function add_city(user_id, long_city_name, short_city_name)
-    json_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(short_city_name).json")
-    path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(short_city_name).jld2")
-    path_walked = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(short_city_name)_walked.jld2")
+    download_city(user_id, long_city_name, short_city_name)
     walked_parts = EverySingleStreet.WalkedParts(Dict{String, Vector{Int}}(), Dict{Int, EverySingleStreet.WalkedWay}())
     save(path_walked, Dict("walked_parts" => walked_parts))
-
-    EverySingleStreet.download(long_city_name, json_path);
-    EverySingleStreet.filter_walkable_json!(json_path);
-    _, city_map = EverySingleStreet.parse_no_graph_map(json_path);
-    save(path, Dict("no_graph_map" => city_map))
-    rm(json_path)
 
     user_data_path = joinpath(DATA_FOLDER, "user_data", "$user_id.json")
     user_data = readjson(user_data_path)
@@ -488,4 +480,15 @@ function add_city(user_id, long_city_name, short_city_name)
     open(user_data_path, "w") do f
         JSON3.write(f, user_data)
     end
+end
+
+function download_city(user_id, long_city_name, short_city_name)
+    json_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(short_city_name).json")
+    path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(short_city_name).jld2")
+
+    EverySingleStreet.download(long_city_name, json_path);
+    EverySingleStreet.filter_walkable_json!(json_path);
+    _, city_map = EverySingleStreet.parse_no_graph_map(json_path);
+    save(path, Dict("no_graph_map" => city_map))
+    rm(json_path)
 end

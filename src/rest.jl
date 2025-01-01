@@ -39,6 +39,13 @@ end
     return "CITY_ADDED"
 end
 
+@post "/update_city" function(req::HTTP.Request)
+    data = json(req)
+    download_city(data[:owner_id], data[:long_name], data[:short_name])
+    full_update(data[:owner_id], data[:short_name])
+    return "CITY_UPDATED"
+end
+
 @post "/full_update" function(req::HTTP.Request)
     data = json(req)
     if haskey(data, :city_name)
