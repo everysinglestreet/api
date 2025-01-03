@@ -28,7 +28,7 @@ end
 @post "/subscribe" function(req::HTTP.Request)
     data = json(req)
     if data[:aspect_type] == "create" && data[:object_type] == "activity"
-        add_activity(data[:owner_id], data[:object_id])
+        @spawn add_activity(data[:owner_id], data[:object_id])
     end
     return "EVENT_RECEIVED"
 end
