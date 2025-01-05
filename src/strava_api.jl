@@ -325,11 +325,10 @@ function save_activity_statistics(user_id, access_token, activity_id, data)
     return needed_download
 end
 
-function get_estimate_eoy(perc, boy=37.28391636651081)
-    this_year = perc - boy
-    days_so_far =  Dates.dayofyear(Dates.now())
-    days_total = Dates.dayofyear(Dates.Date("2025-12-31"))
-    return boy + this_year / days_so_far * days_total
+function get_estimate_eoy(perc)
+    days_so_far = Dates.value(Dates.Date(now())-Dates.Date("2022-12-31"))
+    days_total = Dates.value(Dates.Date("2025-12-31")-Dates.Date("2022-12-31"))
+    return perc / days_so_far * days_total
 end
 
 function get_activity_map_matching(user_id, access_token, activity_data, city_name; walked_parts=EverySingleStreet.WalkedParts())
@@ -485,10 +484,15 @@ end
 function download_city(user_id, long_city_name, short_city_name)
     json_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(short_city_name).json")
     path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(short_city_name).jld2")
+    districts_geojson_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(short_city_name)_districts.geojson")
+    if !isfile(districts_geojson_path)
+        @warn "No districts geojson file was found."
+        districts_geojson_path = nothing
+    end
 
     EverySingleStreet.download(long_city_name, json_path);
     EverySingleStreet.filter_walkable_json!(json_path);
-    _, city_map = EverySingleStreet.parse_no_graph_map(json_path);
+    _, city_map = EverySingleStreet.parse_no_graph_map(json_path, districts_geojson_path);
     save(path, Dict("no_graph_map" => city_map))
     rm(json_path)
 end
