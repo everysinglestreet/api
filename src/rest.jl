@@ -1,11 +1,13 @@
 using Dates
 import DotEnv
 using EverySingleStreet
+using Geodesy
 using OrderedCollections
 using Printf
 using JLD2
 using JSON3
 using Oxygen
+using URIs
 using HTTP
 using Base.Threads
 
@@ -14,6 +16,7 @@ const VERIFY_TOKEN = ENV["VERIFY_TOKEN"]
 const DATA_FOLDER = ENV["DATA_FOLDER"]
 
 include("strava_api.jl")
+include("routing.jl")
 include("utils.jl")
 
 @get "/subscribe" function(req::HTTP.Request)
@@ -86,6 +89,19 @@ end
     params = queryparams(req)
     fname = get_last_image_path(params)
     file(fname)
+end
+
+@get "/routing/{owner_id}/{city_name}" function(req::HTTP.Request, owner_id::Int, city_name::String)
+    url_string = string(req.target)
+    pairs = HTTP.queryparampairs(URI(url_string))
+    if pairs[1][1] != "point" || pairs[2][1] != "point"
+        return HTTP.Response(400, "Bad Request: Url must be of form /routing/{owner_id}/{city_name}?point=...&point=... as first two arguments.")
+    end
+    src_vec = parse.(Float64, split(pairs[1][2], ","))
+    dst_vec = parse.(Float64, split(pairs[2][2], ","))
+    src = LLA(src_vec...)
+    dst = LLA(dst_vec...)
+    return xml(string(best_route_xml(owner_id, city_name, src, dst)))
 end
 
 
