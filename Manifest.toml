@@ -2,7 +2,7 @@
 
 julia_version = "1.10.8"
 manifest_format = "2.0"
-project_hash = "b286475e3d1be17bf1c7c18755e1514d4349dc57"
+project_hash = "550805aafa8ce04efc1e881d155c128dad8ad4c9"
 
 [[deps.Accessors]]
 deps = ["CompositionsBase", "ConstructionBase", "InverseFunctions", "LinearAlgebra", "MacroTools", "Markdown"]
@@ -253,9 +253,9 @@ uuid = "5ae413db-bbd1-5e63-b57d-d24a61df00f5"
 version = "2.2.4+0"
 
 [[deps.EverySingleStreet]]
-deps = ["Accessors", "DataFrames", "DataStructures", "Dates", "Distributions", "FileIO", "GeoInterface", "GeoJSON", "Geodesy", "GeometryBasics", "Graphs", "HMMBase", "JLD2", "JSON3", "LightOSM", "LightXML", "LinearAlgebra", "Luxor", "NearestNeighbors", "OrderedCollections", "PolygonInbounds", "Preferences", "ProgressMeter", "Shapefile", "SparseArrays", "StaticGraphs", "Statistics", "TimeZones", "Unitful"]
-git-tree-sha1 = "2372e1dc0f8632681c1e07acb817b5022bb0ad13"
-repo-rev = "main"
+deps = ["Accessors", "DataFrames", "DataStructures", "Dates", "Distributions", "FileIO", "GeoInterface", "GeoJSON", "Geodesy", "GeometryBasics", "Graphs", "HMMBase", "JLD2", "JSON3", "LightOSM", "LightXML", "LinearAlgebra", "Luxor", "NearestNeighbors", "OrderedCollections", "PolygonInbounds", "Preferences", "ProgressMeter", "Shapefile", "SimpleWeightedGraphs", "SparseArrays", "StaticGraphs", "Statistics", "TimeZones", "Unitful"]
+git-tree-sha1 = "6f27de94cdba3fcfd43f8bd3d3e37d6fd6720827"
+repo-rev = "feature-routing"
 repo-url = "https://github.com/Wikunia/EverySingleStreet.jl.git"
 uuid = "9a55513a-1f47-4b8f-a8c7-9585ec10e442"
 version = "0.1.2"
