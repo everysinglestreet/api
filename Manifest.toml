@@ -250,7 +250,7 @@ version = "2.2.4+0"
 
 [[deps.EverySingleStreet]]
 deps = ["Accessors", "DataFrames", "DataStructures", "Dates", "Distributions", "FileIO", "GeoInterface", "GeoJSON", "Geodesy", "GeometryBasics", "Graphs", "HMMBase", "JLD2", "JSON3", "LightOSM", "LightXML", "LinearAlgebra", "Luxor", "NearestNeighbors", "OrderedCollections", "PolygonInbounds", "Preferences", "ProgressMeter", "Shapefile", "SimpleWeightedGraphs", "SparseArrays", "StaticGraphs", "Statistics", "TimeZones", "Unitful"]
-git-tree-sha1 = "6f27de94cdba3fcfd43f8bd3d3e37d6fd6720827"
+git-tree-sha1 = "bc60c0622a55475e465461da761566fc1b4aef02"
 repo-rev = "feature-routing"
 repo-url = "https://github.com/Wikunia/EverySingleStreet.jl.git"
 uuid = "9a55513a-1f47-4b8f-a8c7-9585ec10e442"
@@ -1264,9 +1264,9 @@ version = "1.1.42+0"
 
 [[deps.XZ_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "beef98d5aad604d9e7d60b2ece5181f7888e2fd6"
+git-tree-sha1 = "56c6604ec8b2d82cc4cfe01aa03b00426aac7e1f"
 uuid = "ffd25f8a-64ca-5728-b0f7-c24cf3aae800"
-version = "5.6.4+0"
+version = "5.6.4+1"
 
 [[deps.Xorg_libX11_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libxcb_jll", "Xorg_xtrans_jll"]
