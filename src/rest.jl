@@ -6,6 +6,7 @@ using Printf
 using JLD2
 using JSON3
 using Oxygen
+using URIs
 using HTTP
 using Base.Threads
 
@@ -86,6 +87,17 @@ end
     params = queryparams(req)
     fname = get_last_image_path(params)
     file(fname)
+end
+
+@get "/routing/{owner_id}" function(req::HTTP.Request, owner_id::Int)
+    url_string = string(req.target)
+    pairs = HTTP.queryparampairs(URI(url_string))
+    if pairs[1][1] != "point" || pairs[2][1] != "point"
+        return HTTP.Response(400, "Bad Request: Url must be of form /routing?point=...&point=... as first two arguments.")
+    end
+    src = parse(Float64, pairs[1][2])
+    dst = parse(Float64, pairs[2][2])
+    return pairs
 end
 
 

@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.10.7"
+julia_version = "1.10.8"
 manifest_format = "2.0"
-project_hash = "ca78d91a326a640f0754045ed0294f7e783bc90e"
+project_hash = "b286475e3d1be17bf1c7c18755e1514d4349dc57"
 
 [[deps.Accessors]]
 deps = ["CompositionsBase", "ConstructionBase", "InverseFunctions", "LinearAlgebra", "MacroTools", "Markdown"]
@@ -254,7 +254,7 @@ version = "2.2.4+0"
 
 [[deps.EverySingleStreet]]
 deps = ["Accessors", "DataFrames", "DataStructures", "Dates", "Distributions", "FileIO", "GeoInterface", "GeoJSON", "Geodesy", "GeometryBasics", "Graphs", "HMMBase", "JLD2", "JSON3", "LightOSM", "LightXML", "LinearAlgebra", "Luxor", "NearestNeighbors", "OrderedCollections", "PolygonInbounds", "Preferences", "ProgressMeter", "Shapefile", "SparseArrays", "StaticGraphs", "Statistics", "TimeZones", "Unitful"]
-git-tree-sha1 = "ef8a82f776c4d6b8891ac2da70d28b49776cde6c"
+git-tree-sha1 = "2372e1dc0f8632681c1e07acb817b5022bb0ad13"
 repo-rev = "main"
 repo-url = "https://github.com/Wikunia/EverySingleStreet.jl.git"
 uuid = "9a55513a-1f47-4b8f-a8c7-9585ec10e442"
