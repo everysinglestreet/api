@@ -309,7 +309,7 @@ function full_update(user_id, city_name)
     walked_xml_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(city_name)_walked.xml")
     district_levels = get_district_levels(user_id, city_name)
     EverySingleStreet.create_xml(city_data_map.nodes, walked_parts, walked_xml_path; districts=city_data_map.districts, district_levels)
-    update_graph(user_id, city_name, city_data_map, walked_parts)
+    update_graph(user_id, city_name, city_data_map, walked_parts; full_update=true)
 end
 
 function save_activity_statistics(user_id, access_token, activity_id, data)

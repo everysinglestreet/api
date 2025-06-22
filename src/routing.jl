@@ -15,15 +15,15 @@ end
 
 
 """
-    update_graph(user_id, city_name, city_map, walked_parts)
+    update_graph(user_id, city_name, city_map, walked_parts; full_update=false)
 
 Update the graph saved in `joinpath(DATA_FOLDER, "city_data", "{user_id}", "{city_name}_graph.jld2")`
 with the given `walked_parts`. This will make edges "longer" that are already walked as well as ways that don't count as walkable roads.
 The updated graph is saved in the same path.
 """
-function update_graph(user_id, city_name, city_map, walked_parts)
+function update_graph(user_id, city_name, city_map, walked_parts; full_update=false)
     g_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(city_name)_graph.jld2")
-    if !ispath(g_path)
+    if !ispath(g_path) || full_update
         graph_data = EverySingleStreet.convert_to_weighted_graph(city_map)
         graph_data = Dict(
             "g" => graph_data.g, 
