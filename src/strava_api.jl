@@ -327,8 +327,10 @@ function save_activity_statistics(user_id, access_token, activity_id, data)
 end
 
 function get_estimate_eoy(perc)
-    days_so_far = Dates.value(Dates.Date(now())-Dates.Date("2022-12-31"))
-    days_total = Dates.value(Dates.Date("2025-12-31")-Dates.Date("2022-12-31"))
+    start_day = Dates.Date("2022-12-31")
+    days_so_far = Dates.value(Dates.Date(now())-start_day)
+    EOY = Dates.Date(year(today()), 12, 31)
+    days_total = Dates.value(EOY-start_day)
     return perc / days_so_far * days_total
 end
 
