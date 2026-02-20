@@ -384,11 +384,125 @@ function add_activity(user_id, access_token, activity_data, city_name; update_de
         desc = "$desc\n$key $value"
     end
 
+    update_description && compute_insta_post(activity_data, data, est_eoy)
     update_description && prepend_activity_description(access_token, activity_data, desc)
     save(city_walked_path, Dict("walked_parts" => data.walked_parts))
     save_activity_statistics(user_id, access_token, activity_id, data)
     update_graph(user_id, city_name, city_data_map, data.walked_parts)
     GC.gc()
+end
+
+function get_temperature(lat, lon)
+    weather_url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m"
+
+    weather_response = HTTP.get(weather_url)
+    weather_data = JSON3.read(weather_response.body)
+
+    temperature_c = weather_data.current.temperature_2m
+    return temperature_c
+end
+
+function get_street_names(walked_parts::EverySingleStreet.WalkedParts)
+    street_names = Set{String}()
+    for way in values(walked_parts.ways)
+        push!(street_names, way.way.name)
+    end
+    return collect(street_names)
+end
+
+function compute_insta_post(activity_data, data, est_eoy)
+    isnothing(GEMINI_API_KEY) && return
+    isnothing(TELEGRAM_BOT_TOKEN) && return
+    isnothing(TELEGRAM_CHAT_ID) && return
+
+    street_names = get_street_names(data.this_walked_parts)
+
+    temperature_c = get_temperature(activity_data[:start_latlng][1], activity_data[:start_latlng][2])
+
+    # Pointing to the Gemini 3 Flash Preview endpoint
+    gemini_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=$GEMINI_API_KEY"
+
+    # --- 3. Constructing the Prompt ---
+    distance_walked_str = @sprintf "%.0fkm" activity_data[:distance]/1000
+    this_walked_road_km_str = @sprintf "%.0fkm" data.this_walked_road_km
+    added_kms_str = @sprintf "%.0fkm" data.added_kms
+    est_eoy_str = @sprintf "%.0f%%" est_eoy
+
+    prompt = """
+    Act as an enthusiastic urban explorer. Write 3 DISTINCT, SHORT options for an engaging Instagram post about my mission to walk every single street of Hamburg. 
+
+    **CONTEXT & DATA:**
+    Today I walked: $(join(street_names, ", "))
+
+    Stats to include:
+    - Distance: $(distance_walked_str)
+    - Road kms: $(this_walked_road_km_str)
+    - Added road kms: $(added_kms_str)
+    - Estimated EOY: $(est_eoy_str)
+    - Temperature: $(temperature_c) °C
+
+    **OPTION STYLES:**
+    - Option 1: Data-focused but punchy.
+    - Option 2: Atmosphere/weather-focused.
+    - Option 3: Casual and community-focused.
+
+    **CRITICAL INSTRUCTIONS:**
+    1. **Formatting:** Separate each option EXACTLY with the text "===" on a new line. Do not use "===" anywhere else.
+    2. **Length:** Keep the intro text SHORT. Maximum five short sentences before the stats. 
+    3. **Interesting**: If you know a verifiable fact about a street, include it. If you do not know a true fact, skip this step entirely.
+    4. **Visible Stats List:** Do NOT hide the stats in paragraphs. Display them explicitly as a clean list using emojis (e.g., 🚶, 🛣️, ➕, 🎯, 🌡️) so they are instantly visible.
+    5. **Emojis:** Use plenty of emojis throughout the caption to make it pop.
+    6. **No Markdown:** DO NOT use any Markdown formatting. No bold (**), no italics (*), and no headers. Plain text and emojis only.
+    7. **Call to Action & Soleprints:** End every post by asking followers which city THEY would love to explore, mentioning Soleprints as the perfect tool for mapping their own city of choice (Note: Soleprints is a general exploration tool, not specific to Hamburg).
+    8. **Hashtags:** End every post with exactly 5 hashtags: #everysinglestreet #soleprints and 3 other relevant ones.
+    """
+
+    body = Dict(
+        "contents" => [
+            Dict(
+                "parts" => [
+                    Dict("text" => prompt)
+                ]
+            )
+        ]
+    )
+
+    # --- 4. Call Gemini to Generate the Post ---
+    response = HTTP.post(
+        gemini_url,
+        ["Content-Type" => "application/json"],
+        JSON3.write(body)
+    )
+
+    parsed = JSON3.read(response.body)
+    full_response = parsed.candidates[1].content.parts[1].text
+
+    println("Generated Caption:\n", full_response)
+
+    # --- 5. Push the Caption to Telegram ---
+    telegram_url = "https://api.telegram.org/bot$(TELEGRAM_BOT_TOKEN)/sendMessage"
+
+   caption_options = split(full_response, "===")
+
+    for option_text in caption_options
+        clean_text = strip(option_text) # Removes any trailing whitespace or empty lines
+        
+        # Only send if the split chunk actually contains text
+        if !isempty(clean_text)
+            telegram_payload = Dict(
+                "chat_id" => TELEGRAM_CHAT_ID,
+                "text" => clean_text
+            )
+            
+            HTTP.post(
+                telegram_url,
+                ["Content-Type" => "application/json"],
+                JSON3.write(telegram_payload)
+            )
+        end
+    end
+
+    println("\nSuccessfully pushed to telegram")
 end
 
 function add_activity(user_id, activity_id::Int, force_update=(time_diff)->false; update_description=true)
