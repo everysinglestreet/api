@@ -503,8 +503,6 @@ function compute_insta_post(activity_data, data, est_eoy, statistics_before, sta
     parsed = JSON3.read(response.body)
     full_response = parsed.candidates[1].content.parts[1].text
 
-    println("Generated Caption:\n", full_response)
-
     # --- 5. Push the Caption to Telegram ---
     telegram_url = "https://api.telegram.org/bot$(TELEGRAM_BOT_TOKEN)/sendMessage"
 
