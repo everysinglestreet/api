@@ -211,7 +211,7 @@ function get_statistics(user_id, city_name)
     return (walked_road_km = walked_road_km, road_km = road_km, perc = walked_road_km / road_km * 100)
 end
 
-function get_district_statistics(user_id, city_name)
+function get_district_statistics(user_id, city_name; geojson=false)
     city_data_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(city_name).jld2")
     city_walked_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(city_name)_walked.jld2")
     city_data = load(city_data_path)
@@ -230,6 +230,49 @@ function get_district_statistics(user_id, city_name)
         push!(result, Dict(:name => district, :kms => district_kms[district], :walked_kms => walked_district_kms[district], :perc => 100 * (walked_district_kms[district] / district_kms[district])))
     end
     result = sort(result, by=(d->d[:perc]), rev=true)
+
+    if geojson
+        features = Vector{Dict{String, Any}}()
+        districts_map = Dict(d.name => d for d in city_data_map.districts)
+        for stat in result
+            district_name = stat[:name]
+            if haskey(districts_map, district_name)
+                district = districts_map[district_name]
+                polygons = district.polygons
+                
+                geometry = Dict{String, Any}()
+                if isempty(polygons)
+                    continue
+                end
+
+                # Assuming Point2 is (lat, lon), GeoJSON needs [lon, lat]
+                ring_to_coords(ring) = [[p[2], p[1]] for p in ring]
+
+                if length(polygons) == 1
+                    geometry["type"] = "Polygon"
+                    coords = [ring_to_coords(polygons[1].outer)]
+                    append!(coords, [ring_to_coords(h) for h in polygons[1].holes])
+                    geometry["coordinates"] = coords
+                else
+                    geometry["type"] = "MultiPolygon"
+                    multi_coords = []
+                    for p in polygons
+                        poly_coords = [ring_to_coords(p.outer)]
+                        append!(poly_coords, [ring_to_coords(h) for h in p.holes])
+                        push!(multi_coords, poly_coords)
+                    end
+                    geometry["coordinates"] = multi_coords
+                end
+                
+                push!(features, Dict(
+                    "type" => "Feature",
+                    "geometry" => geometry,
+                    "properties" => stat
+                ))
+            end
+        end
+        return Dict("type" => "FeatureCollection", "features" => features)
+    end
     return result
 end
 

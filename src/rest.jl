@@ -73,12 +73,13 @@ end
     return Dict(:success => true)
 end
 
-@get "/districts" function(req::HTTP.Request)
+@post "/districts" function(req::HTTP.Request)
     data = json(req)
-    return get_district_statistics(data[:owner_id], data[:city_name])
+    geojson = get(data, :geojson, false)
+    return get_district_statistics(data[:owner_id], data[:city_name]; geojson=geojson)
 end
 
-@get "/statistics" function(req::HTTP.Request)
+@post "/statistics" function(req::HTTP.Request)
     data = json(req)
     return get_statistics(data[:owner_id])
 end
