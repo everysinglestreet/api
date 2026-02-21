@@ -31,3 +31,21 @@ function wait_rate_limit(header)
     @warn "Avoiding reaching rate limit. Wait for $sleep_min minutes. Current rate usage $rateusage_15 out of $ratelimit_15."
     sleep(sleep_min*60)
 end
+
+function cors_middleware(handler)
+    return function(req::HTTP.Request)
+        # Handle preflight requests
+        if HTTP.method(req) == "OPTIONS"
+            return HTTP.Response(200, [
+                "Access-Control-Allow-Origin" => "*",
+                "Access-Control-Allow-Methods" => "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers" => "Content-Type, Authorization"
+            ])
+        end
+        
+        # Process the actual request and inject the CORS header
+        res = handler(req)
+        HTTP.setheader(res, "Access-Control-Allow-Origin" => "*")
+        return res
+    end
+end

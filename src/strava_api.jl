@@ -245,8 +245,8 @@ function get_district_statistics(user_id, city_name; geojson=false)
                     continue
                 end
 
-                # Assuming Point2 is (lat, lon), GeoJSON needs [lon, lat]
-                ring_to_coords(ring) = [[p[2], p[1]] for p in ring]
+                # Point2 is (lon, lat), same as GeoJSON
+                ring_to_coords(ring) = [[p[1], p[2]] for p in ring]
 
                 if length(polygons) == 1
                     geometry["type"] = "Polygon"

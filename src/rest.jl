@@ -109,4 +109,4 @@ end
 end
 
 
-serve(host="0.0.0.0", port=8000)
+serve(host="0.0.0.0", port=8000, middleware=[cors_middleware])
