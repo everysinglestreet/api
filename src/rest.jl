@@ -14,6 +14,9 @@ using Base.Threads
 DotEnv.config()
 const VERIFY_TOKEN = ENV["VERIFY_TOKEN"]
 const DATA_FOLDER = ENV["DATA_FOLDER"]
+const GEMINI_API_KEY = get(ENV, "GEMINI_API_KEY", nothing)
+const TELEGRAM_BOT_TOKEN = get(ENV, "TELEGRAM_BOT_TOKEN", nothing)
+const TELEGRAM_CHAT_ID = get(ENV, "TELEGRAM_CHAT_ID", nothing)
 
 include("strava_api.jl")
 include("routing.jl")
