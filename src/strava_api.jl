@@ -508,7 +508,7 @@ function compute_insta_post(activity_data, data, est_eoy, statistics_before, sta
     # --- 5. Push the Caption to Telegram ---
     telegram_url = "https://api.telegram.org/bot$(TELEGRAM_BOT_TOKEN)/sendMessage"
 
-   caption_options = split(full_response, "===")
+    caption_options = split(full_response, "===")
 
     for option_text in caption_options
         clean_text = strip(option_text) # Removes any trailing whitespace or empty lines
