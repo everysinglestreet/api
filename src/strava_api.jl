@@ -211,7 +211,7 @@ function get_statistics(user_id, city_name)
     return (walked_road_km = walked_road_km, road_km = road_km, perc = walked_road_km / road_km * 100)
 end
 
-function get_district_statistics(user_id, city_name)
+function get_district_statistics(user_id, city_name; geojson=false)
     city_data_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(city_name).jld2")
     city_walked_path = joinpath(DATA_FOLDER, "city_data", "$user_id", "$(city_name)_walked.jld2")
     city_data = load(city_data_path)
@@ -230,7 +230,77 @@ function get_district_statistics(user_id, city_name)
         push!(result, Dict(:name => district, :kms => district_kms[district], :walked_kms => walked_district_kms[district], :perc => 100 * (walked_district_kms[district] / district_kms[district])))
     end
     result = sort(result, by=(d->d[:perc]), rev=true)
+
+    if geojson
+        features = Vector{Dict{String, Any}}()
+        districts_map = Dict(d.name => d for d in city_data_map.districts)
+        for stat in result
+            district_name = stat[:name]
+            if haskey(districts_map, district_name)
+                district = districts_map[district_name]
+                polygons = district.polygons
+                
+                geometry = Dict{String, Any}()
+                if isempty(polygons)
+                    continue
+                end
+
+                # Point2 is (lon, lat), same as GeoJSON
+                ring_to_coords(ring) = [[p[1], p[2]] for p in ring]
+
+                if length(polygons) == 1
+                    geometry["type"] = "Polygon"
+                    coords = [ring_to_coords(polygons[1].outer)]
+                    append!(coords, [ring_to_coords(h) for h in polygons[1].holes])
+                    geometry["coordinates"] = coords
+                else
+                    geometry["type"] = "MultiPolygon"
+                    multi_coords = []
+                    for p in polygons
+                        poly_coords = [ring_to_coords(p.outer)]
+                        append!(poly_coords, [ring_to_coords(h) for h in p.holes])
+                        push!(multi_coords, poly_coords)
+                    end
+                    geometry["coordinates"] = multi_coords
+                end
+                
+                push!(features, Dict(
+                    "type" => "Feature",
+                    "geometry" => geometry,
+                    "properties" => stat
+                ))
+            end
+        end
+        return Dict("type" => "FeatureCollection", "features" => features)
+    end
     return result
+end
+
+"""
+    update_cache(user_id, city_name)
+
+Recompute and persist the cached JSON responses for the `/statistics` and `/districts`
+endpoints for the given user and city. Cache files are written to
+`user_data/{user_id}/` so the endpoints can serve them directly without reloading
+the heavy JLD2 map data. Should be called after `add_activity` or `full_update`
+completes for `city_name`.
+"""
+function update_cache(user_id, city_name)
+    cache_dir = joinpath(DATA_FOLDER, "user_data", "$user_id")
+    mkpath(cache_dir)
+
+    stats = get_statistics(user_id)
+    open(joinpath(cache_dir, "statistics_cache.json"), "w") do io
+        JSON3.pretty(io, stats)
+    end
+
+    for geojson in (false, true)
+        suffix = geojson ? "_geojson" : ""
+        districts = get_district_statistics(user_id, city_name; geojson)
+        open(joinpath(cache_dir, "districts_$(city_name)$(suffix).json"), "w") do io
+            JSON3.pretty(io, districts)
+        end
+    end
 end
 
 function get_district_levels(user_id, city_name)
@@ -310,6 +380,7 @@ function full_update(user_id, city_name)
     district_levels = get_district_levels(user_id, city_name)
     EverySingleStreet.create_xml(city_data_map.nodes, walked_parts, walked_xml_path; districts=city_data_map.districts, district_levels)
     update_graph(user_id, city_name, city_data_map, walked_parts)
+    update_cache(user_id, city_name)
 end
 
 function save_activity_statistics(user_id, access_token, activity_id, data)
@@ -389,6 +460,7 @@ function add_activity(user_id, access_token, activity_data, city_name; update_de
     save(city_walked_path, Dict("walked_parts" => data.walked_parts))
     save_activity_statistics(user_id, access_token, activity_id, data)
     update_graph(user_id, city_name, city_data_map, data.walked_parts)
+    update_cache(user_id, city_name)
     GC.gc()
 end
 
