@@ -276,6 +276,33 @@ function get_district_statistics(user_id, city_name; geojson=false)
     return result
 end
 
+"""
+    update_cache(user_id, city_name)
+
+Recompute and persist the cached JSON responses for the `/statistics` and `/districts`
+endpoints for the given user and city. Cache files are written to
+`user_data/{user_id}/` so the endpoints can serve them directly without reloading
+the heavy JLD2 map data. Should be called after `add_activity` or `full_update`
+completes for `city_name`.
+"""
+function update_cache(user_id, city_name)
+    cache_dir = joinpath(DATA_FOLDER, "user_data", "$user_id")
+    mkpath(cache_dir)
+
+    stats = get_statistics(user_id)
+    open(joinpath(cache_dir, "statistics_cache.json"), "w") do io
+        JSON3.pretty(io, stats)
+    end
+
+    for geojson in (false, true)
+        suffix = geojson ? "_geojson" : ""
+        districts = get_district_statistics(user_id, city_name; geojson)
+        open(joinpath(cache_dir, "districts_$(city_name)$(suffix).json"), "w") do io
+            JSON3.pretty(io, districts)
+        end
+    end
+end
+
 function get_district_levels(user_id, city_name)
     district_stats = get_district_statistics(user_id, city_name)
     district_levels = Dict{Symbol, Int}()
@@ -353,6 +380,7 @@ function full_update(user_id, city_name)
     district_levels = get_district_levels(user_id, city_name)
     EverySingleStreet.create_xml(city_data_map.nodes, walked_parts, walked_xml_path; districts=city_data_map.districts, district_levels)
     update_graph(user_id, city_name, city_data_map, walked_parts)
+    update_cache(user_id, city_name)
 end
 
 function save_activity_statistics(user_id, access_token, activity_id, data)
@@ -432,6 +460,7 @@ function add_activity(user_id, access_token, activity_data, city_name; update_de
     save(city_walked_path, Dict("walked_parts" => data.walked_parts))
     save_activity_statistics(user_id, access_token, activity_id, data)
     update_graph(user_id, city_name, city_data_map, data.walked_parts)
+    update_cache(user_id, city_name)
     GC.gc()
 end
 

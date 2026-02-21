@@ -75,13 +75,27 @@ end
 
 @post "/districts" function(req::HTTP.Request)
     data = json(req)
+    user_id = data[:owner_id]
+    city_name = data[:city_name]
     geojson = get(data, :geojson, false)
-    return get_district_statistics(data[:owner_id], data[:city_name]; geojson=geojson)
+    suffix = geojson ? "_geojson" : ""
+    cache_path = joinpath(DATA_FOLDER, "user_data", "$user_id", "districts_$(city_name)$(suffix).json")
+    isfile(cache_path) && return readjson(cache_path)
+    districts = get_district_statistics(user_id, city_name; geojson)
+    mkpath(dirname(cache_path))
+    open(cache_path, "w") do io; JSON3.pretty(io, districts); end
+    return districts
 end
 
 @post "/statistics" function(req::HTTP.Request)
     data = json(req)
-    return get_statistics(data[:owner_id])
+    user_id = data[:owner_id]
+    cache_path = joinpath(DATA_FOLDER, "user_data", "$user_id", "statistics_cache.json")
+    isfile(cache_path) && return readjson(cache_path)
+    stats = get_statistics(user_id)
+    mkpath(dirname(cache_path))
+    open(cache_path, "w") do io; JSON3.pretty(io, stats); end
+    return stats
 end
 
 @get "/activity_statistics" function(req::HTTP.Request)
