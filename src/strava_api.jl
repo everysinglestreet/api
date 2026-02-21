@@ -392,6 +392,14 @@ function add_activity(user_id, access_token, activity_data, city_name; update_de
     GC.gc()
 end
 
+
+"""
+    get_temperature(lat, lon)
+
+
+Fetch the current temperature at a specific latitude and longitude using the Open-Meteo API.
+Returns the temperature in degrees Celsius as a Float64.
+"""
 function get_temperature(lat, lon)
     weather_url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m"
 
@@ -402,6 +410,11 @@ function get_temperature(lat, lon)
     return temperature_c
 end
 
+"""
+    get_street_names(walked_parts::EverySingleStreet.WalkedParts)
+
+Extract a unique list of street names from the provided `walked_parts`.
+"""
 function get_street_names(walked_parts::EverySingleStreet.WalkedParts)
     street_names = Set{String}()
     for way in values(walked_parts.ways)
@@ -410,6 +423,13 @@ function get_street_names(walked_parts::EverySingleStreet.WalkedParts)
     return collect(street_names)
 end
 
+
+"""
+    compute_insta_post(activity_data, data, est_eoy, statistics_before, statistics_after)
+
+Generate 3 distinct Instagram post options using the Gemini API based on activity data,
+including street names, weather, and progress statistics, then send them to a Telegram chat.
+"""
 function compute_insta_post(activity_data, data, est_eoy, statistics_before, statistics_after)
     isnothing(GEMINI_API_KEY) && return
     isnothing(TELEGRAM_BOT_TOKEN) && return
