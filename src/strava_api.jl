@@ -384,7 +384,7 @@ function add_activity(user_id, access_token, activity_data, city_name; update_de
         desc = "$desc\n$key $value"
     end
 
-    update_description && compute_insta_post(activity_data, data, est_eoy)
+    update_description && compute_insta_post(activity_data, data, est_eoy, statistics_before, statistics_after)
     update_description && prepend_activity_description(access_token, activity_data, desc)
     save(city_walked_path, Dict("walked_parts" => data.walked_parts))
     save_activity_statistics(user_id, access_token, activity_id, data)
@@ -410,10 +410,11 @@ function get_street_names(walked_parts::EverySingleStreet.WalkedParts)
     return collect(street_names)
 end
 
-function compute_insta_post(activity_data, data, est_eoy)
+function compute_insta_post(activity_data, data, est_eoy, statistics_before, statistics_after)
     isnothing(GEMINI_API_KEY) && return
     isnothing(TELEGRAM_BOT_TOKEN) && return
     isnothing(TELEGRAM_CHAT_ID) && return
+    println("Working on instagram post ideas...")
 
     street_names = get_street_names(data.this_walked_parts)
 
@@ -423,10 +424,15 @@ function compute_insta_post(activity_data, data, est_eoy)
     gemini_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=$GEMINI_API_KEY"
 
     # --- 3. Constructing the Prompt ---
-    distance_walked_str = @sprintf "%.0fkm" activity_data[:distance]/1000
-    this_walked_road_km_str = @sprintf "%.0fkm" data.this_walked_road_km
-    added_kms_str = @sprintf "%.0fkm" data.added_kms
-    est_eoy_str = @sprintf "%.0f%%" est_eoy
+    distance_walked_str = @sprintf "%.1fkm" activity_data[:distance]/1000
+    this_walked_road_km_str = @sprintf "%.1fkm" data.this_walked_road_km
+    added_kms_str = @sprintf "%.1fkm" data.added_kms
+    est_eoy_str = @sprintf "%.1f%%" est_eoy
+    temperature_c_str = @sprintf "%.0f°C" temperature_c
+    district_stats = "District stats:"
+    for (key, value) in compare_statistics(statistics_before, statistics_after)
+        district_stats = "$district_stats\n$key $value"
+    end
 
     prompt = """
     Act as an enthusiastic urban explorer. Write 3 DISTINCT, SHORT options for an engaging Instagram post about my mission to walk every single street of Hamburg. 
@@ -439,7 +445,8 @@ function compute_insta_post(activity_data, data, est_eoy)
     - Road kms: $(this_walked_road_km_str)
     - Added road kms: $(added_kms_str)
     - Estimated EOY: $(est_eoy_str)
-    - Temperature: $(temperature_c) °C
+    - Temperature: $(temperature_c_str)
+    - $district_stats 
 
     **OPTION STYLES:**
     - Option 1: Data-focused but punchy.
@@ -453,8 +460,7 @@ function compute_insta_post(activity_data, data, est_eoy)
     4. **Visible Stats List:** Do NOT hide the stats in paragraphs. Display them explicitly as a clean list using emojis (e.g., 🚶, 🛣️, ➕, 🎯, 🌡️) so they are instantly visible.
     5. **Emojis:** Use plenty of emojis throughout the caption to make it pop.
     6. **No Markdown:** DO NOT use any Markdown formatting. No bold (**), no italics (*), and no headers. Plain text and emojis only.
-    7. **Call to Action & Soleprints:** End every post by asking followers which city THEY would love to explore, mentioning Soleprints as the perfect tool for mapping their own city of choice (Note: Soleprints is a general exploration tool, not specific to Hamburg).
-    8. **Hashtags:** End every post with exactly 5 hashtags: #everysinglestreet #soleprints and 3 other relevant ones.
+    7. **Hashtags:** End every post with exactly 5 hashtags: #everysinglestreet #soleprints and 3 other relevant ones.
     """
 
     body = Dict(
